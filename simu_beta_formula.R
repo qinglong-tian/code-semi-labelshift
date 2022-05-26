@@ -4,7 +4,6 @@ library(Rcpp)
 library(tidyverse)
 library(fastGHQuad)
 source("data_generating_functions.R")
-source("estimation_functions.R")
 sourceCpp("fast_estimation_functions.cpp")
 ################################################
 # Factors
@@ -27,16 +26,9 @@ coef_y_x_s_true <- c(yx_dist$Beta0, yx_dist$Beta1)
 var_y_x_s_true <- yx_dist$VarYX
 sigma_y_x_s_true <- sqrt(var_y_x_s_true)
 
-# fityx <- lm(Y~., data = as.data.frame(sData))
-# coef_y_x_s_hat <- coef(fityx)
-# sigma_y_x_s_hat <- sigma(fityx)
-# 
-# Mu_Y_S_hat <- mean(sData[,"Y"])
-# Sig_Y_S_hat <- sd(sData[,"Y"])
 ################################################
 beta_rho <- trueBetaRho
-B1 <- 5000 # Monte-Carlo Sample Size
-# B2 <- 10 # Bootstrap (Perturbation Size)
+B1 <- 20 # Monte-Carlo Sample Size
 
 gh_num <- 12
 ghxw <- gaussHermiteData(gh_num)
