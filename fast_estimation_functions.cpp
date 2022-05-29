@@ -284,27 +284,15 @@ double EstimateBetaFunc_CPP(NumericVector beta_rho, NumericMatrix sData, Numeric
 
 // For the perturbation
 // [[Rcpp::export]]
-double EstimateBetaFuncSum_CPP(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData,
+double EstimateBetaFuncPert_CPP(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData,
                                double piVal, NumericMatrix tDat_ext, NumericVector coef_y_x_s, double sigma_y_x_s,
-                               bool ispar, List parameters, NumericVector xList, NumericVector wList, bool weights = false) {
+                               bool ispar, List parameters, NumericVector xList, NumericVector wList, NumericVector rexpVec) {
   double out;
   NumericMatrix Seff = ComputeEfficientScore_CPP(beta_rho, sData, tData, piVal, tDat_ext, coef_y_x_s, sigma_y_x_s,
                                                  ispar, parameters, xList, wList);
   int num_of_row = Seff.nrow();
-  
-  NumericVector rexpVec(num_of_row);
-  if (!weights) {
-    for (int i=0; i<num_of_row; i++) {
-      rexpVec(i) = 1;
-    }
-  }
-  else {
-    for (int i=0; i<num_of_row; i++) {
-      rexpVec(i) = R::rexp(1);
-    }
-  }
-  
   double sumTmp1 = 0, sumTmp2 = 0;
+  
   for(int i = 0; i<num_of_row; i++) {
     sumTmp1 += rexpVec(i)*Seff(i,0);
     sumTmp2 += rexpVec(i)*Seff(i,1);
