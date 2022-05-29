@@ -687,3 +687,49 @@ double COMPUTE_THETA_NAIVE(NumericVector betaHat, NumericVector rhoValSource,
   
   return out;
 }
+
+// [[Rcpp::export]]
+double COMPUTE_THETA_Pert_CPP(int num_of_target,
+                              double piVal,
+                              NumericVector rhoValSource,
+                              double c_ps,
+                              NumericVector yVec,
+                              NumericVector beta_rho,
+                              double e_t_tau,
+                              NumericVector tau_x_internal_all,
+                              NumericVector tau_x_external,
+                              NumericVector e_s_rho2_psi_x_internal_all,
+                              NumericVector e_s_rho2_x_internal_all,
+                              NumericVector e_s_rho2_psi_x_external,
+                              NumericVector e_s_rho2_x_external,
+                              NumericVector rexpVec) {
+  int num_of_source = yVec.length(), i;
+  double numerator = 0, denominator = 0;
+  for (i=0; i<num_of_source; i++) {
+    numerator += rhoValSource(i)/c_ps/piVal*yVec(i)*rexpVec(i);
+  }
+  
+  NumericVector AVec = COMPUTE_A_CPP(beta_rho, e_t_tau,
+                                     tau_x_internal_all, tau_x_external,
+                                     e_s_rho2_psi_x_internal_all, e_s_rho2_x_internal_all,
+                                     e_s_rho2_psi_x_external, e_s_rho2_x_external);
+  for (i=0; i<num_of_source; i++) {
+    numerator += 1/piVal*rhoValSource(i)/c_ps*AVec(i)*rexpVec(i);
+  }
+  for (i=0; i<num_of_target; i++) {
+    numerator -= 1/(1-piVal)*AVec(i+num_of_source)*rexpVec(i+num_of_source);
+  }
+  
+  NumericVector BVec = COMPUTE_B_CPP(tau_x_internal_all, e_t_tau, c_ps, piVal);
+  for (i=0; i<num_of_source; i++) {
+    denominator += 1/piVal*rhoValSource(i)/c_ps*rexpVec(i);
+    denominator += 1/piVal*rhoValSource(i)/c_ps*BVec(i)*rexpVec(i);
+  }
+  for (i=0; i<num_of_target; i++) {
+    denominator -= 1/(1-piVal)*BVec(i+num_of_source)*rexpVec(i+num_of_source);
+  }
+  
+  double Theta = numerator/denominator;
+  
+  return Theta;
+}
