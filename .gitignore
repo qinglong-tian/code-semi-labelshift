@@ -38,8 +38,5 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# Folder to save simulation results
-/dat1
-
 # R Data
 *.RDS
