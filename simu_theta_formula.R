@@ -7,7 +7,7 @@
   sourceCpp("fast_estimation_functions.cpp")
   ################################################
   # Factors #
-  n <- 500
+  n <- 8000
   mnratio <- 1
   ################################################
   # Data Generation #
@@ -29,7 +29,7 @@
   ################################################
   m <- mnratio*n
   beta_rho <- trueBetaRho
-  B1 <- 100 # Monte-Carlo Sample Size
+  B1 <- 1000 # Monte-Carlo Sample Size
   # B2 <- 10 # Bootstrap (Perturbation Size)
   
   gh_num <- 10
@@ -92,14 +92,6 @@
                                       coef_y_x_s_hat, sigma_y_x_s_hat, ispar, GH_Materials,
                                       xList, wList)
     
-    # optim(Mu_Y_T, COMPUTE_EFFICIENT_IF_FOR_THETA_OPTIM_CPP, num_of_target = num_of_target,
-    #       piVal = piVal, rhoValSource=rhoValSource, c_ps = c_ps, yVec = yVec, beta_rho = betaHat, e_t_tau=e_t_tau, tau_x_internal_all=tau_x_internal_all, tau_x_external=tau_x_external,
-    #       e_s_rho2_psi_x_internal_all=e_s_rho2_psi_x_internal_all, e_s_rho2_x_internal_all = e_s_rho2_x_all, e_s_rho2_psi_x_external = e_s_rho2_psi_x_external,
-    #       e_s_rho2_x_external = e_s_rho2_x_ext, MatInv = MatInv, ispar = ispar, parameters = GH_Materials, sData = sData, coef_y_x_s=coef_y_x_s_hat, sigma_y_x_s=sigma_y_x_s_hat,
-    #       e_s_rho2_psi_x_internal_source=e_s_rho2_psi_x_internal_source, e_s_rho2_x_internal_source=e_s_rho2_x_internal_source, tau_for_x_source=tau_for_x_source,
-    #       e_s_rho_x_source = e_s_rho_x_internal_source, xList = xList, wList = wList, SEff = SEff, method = "Brent", lower = -100, upper = 100) -> thetaFit
-    # thetaHat <- thetaFit$par
-    
     thetaHat <- COMPUTE_THETA_CPP(num_of_target, piVal, rhoValSource, c_ps, yVec,
                                   betaHat, e_t_tau, tau_x_internal_all, tau_x_external,
                                   e_s_rho2_psi_x_internal_all, e_s_rho2_x_all,
@@ -122,9 +114,11 @@
     
     return(list(ThetaHat=thetaHat, SdHat=sd_est, Bias = thetaHat-Mu_Y_T, CP = CP,
                 ThetaNaive = thetaNHat))
-  }, mc.cores = detectCores()
+  },
+  mc.cores = detectCores()
 )
 
 sapply(results_output, function(x) {x$ThetaHat}) %>% sd
 sapply(results_output, function(x) {x$ThetaNaive}) %>% sd
 sapply(results_output, function(x) {x$SdHat}) %>% mean
+sapply(results_output, function(x) {x$CP}) %>% mean

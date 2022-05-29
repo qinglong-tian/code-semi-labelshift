@@ -282,6 +282,7 @@ double EstimateBetaFunc_CPP(NumericVector beta_rho, NumericMatrix sData, Numeric
   return out;
 }
 
+// For the perturbation
 // [[Rcpp::export]]
 double EstimateBetaFuncSum_CPP(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData,
                                double piVal, NumericMatrix tDat_ext, NumericVector coef_y_x_s, double sigma_y_x_s,
