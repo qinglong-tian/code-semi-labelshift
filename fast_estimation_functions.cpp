@@ -524,14 +524,13 @@ NumericVector COMPUTE_D_MULTIPLIER(NumericVector beta_rho, bool ispar, List para
                                    double sigma_y_x_s, NumericVector e_s_rho2_psi_x_external,
                                    NumericVector e_s_rho2_x_external,
                                    NumericVector e_s_rho2_psi_x_internal_source, NumericVector e_s_rho2_x_internal_source, NumericVector tau_for_x_source,
-                                   NumericVector e_s_rho_x_source, NumericVector xList, NumericVector wList,
-                                   double beta_hat) {
+                                   NumericVector e_s_rho_x_source, NumericVector xList, NumericVector wList) {
   NumericVector e_s_rho_y_123 = E_S_RHO_Y_CPP(beta_rho, ispar, parameters, sData);
   NumericVector DMult(2);
   
   double e_t_rho_y_1 = e_s_rho_y_123(0)/c_ps, e_t_rho_y_2 = e_s_rho_y_123(1)/c_ps, e_t_rho_y_3 = e_s_rho_y_123(2)/c_ps;
-  DMult(0) = e_t_rho_y_2-beta_hat*e_t_rho_y_1;
-  DMult(1) = e_t_rho_y_3-beta_hat*e_t_rho_y_2;
+  DMult(0) = e_t_rho_y_2-theta*e_t_rho_y_1;
+  DMult(1) = e_t_rho_y_3-theta*e_t_rho_y_2;
 
   int num_of_xy = sData.ncol();
   NumericMatrix sData_x_only = sData( _ , Range(1, num_of_xy-1));
@@ -570,26 +569,13 @@ NumericVector COMPUTE_D_CPP(NumericVector beta_rho, bool ispar, List parameters,
                                    NumericVector e_s_rho2_psi_x_internal_source, NumericVector e_s_rho2_x_internal_source, NumericVector tau_for_x_source,
                                    NumericVector e_s_rho_x_source, NumericVector xList, NumericVector wList,
                                    NumericMatrix MatInv) {
-  int num_of_source = sData.nrow();
-  NumericVector rhoVec(num_of_source);
-  double beta_hat=0;
-  for (int i=0; i<num_of_source; i++) {
-    rhoVec(i) = exp(beta_rho(0)*sData(i,0)+beta_rho(1)*sData(i,0)*sData(i,0));
-    beta_hat += rhoVec(i)*sData(i,0);
-  }
-  beta_hat /= num_of_source*c_ps;
-  
-  for (int i=0; i<num_of_source; i++) {
-    
-  }
-  
   NumericVector DMult = COMPUTE_D_MULTIPLIER(beta_rho, ispar, parameters, sData,
                                              theta, piVal, c_ps,
                                              e_t_tau, tau_x_external, coef_y_x_s,
                                              sigma_y_x_s, e_s_rho2_psi_x_external,
                                              e_s_rho2_x_external, e_s_rho2_psi_x_internal_source,
                                              e_s_rho2_x_internal_source, tau_for_x_source,
-                                             e_s_rho_x_source, xList, wList, beta_hat);
+                                             e_s_rho_x_source, xList, wList);
   NumericVector DVec(2);
   DVec(0) = DMult(0)*MatInv(0,0)+DMult(1)*MatInv(1,0);
   DVec(1) = DMult(0)*MatInv(1,0)+DMult(1)*MatInv(1,1);
