@@ -23,8 +23,8 @@
   var_y_x_s_true <- yx_dist$VarYX
   sigma_y_x_s_true <- sqrt(var_y_x_s_true)
   ################################################
-  B1 <- 5 # Monte-Carlo Sample Size
-  B2 <- 5
+  B1 <- 1000 # Monte-Carlo Sample Size
+  B2 <- 500
   ################################################
   # Factors #
   n_vec <- c(200, 400, 600, 800, 1000)
