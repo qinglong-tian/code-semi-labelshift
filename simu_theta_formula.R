@@ -7,7 +7,7 @@
   sourceCpp("fast_estimation_functions.cpp")
   ################################################
   # Factors #
-  n <- 8000
+  n <- 500
   mnratio <- 1
   ################################################
   # Data Generation #
@@ -29,10 +29,10 @@
   ################################################
   m <- mnratio*n
   beta_rho <- trueBetaRho
-  B1 <- 1000 # Monte-Carlo Sample Size
+  B1 <- 500 # Monte-Carlo Sample Size
   # B2 <- 10 # Bootstrap (Perturbation Size)
   
-  gh_num <- 10
+  gh_num <- 11
   ghxw <- gaussHermiteData(gh_num)
   xList <- ghxw$x
   wList <- ghxw$w
@@ -110,7 +110,7 @@
     sd_est <- sqrt(var_est/(n+m))
     CI_Lower <- thetaHat-1.96*sd_est
     CI_Upper <- thetaHat+1.96*sd_est
-    CP <- (Mu_Y_T >= CI_Lower) & (Mu_Y_T <= CI_Upper)
+    CP <- (Mu_Y_T > CI_Lower) & (Mu_Y_T < CI_Upper)
     
     return(list(ThetaHat=thetaHat, SdHat=sd_est, Bias = thetaHat-Mu_Y_T, CP = CP,
                 ThetaNaive = thetaNHat))
@@ -122,3 +122,79 @@ sapply(results_output, function(x) {x$ThetaHat}) %>% sd
 sapply(results_output, function(x) {x$ThetaNaive}) %>% sd
 sapply(results_output, function(x) {x$SdHat}) %>% mean
 sapply(results_output, function(x) {x$CP}) %>% mean
+
+############################
+# Perturbation
+############################
+B2 <- 200
+rexpVec_list <- mclapply(1:B2, function(x)
+  {
+  rexp(n+m)
+},
+mc.cores = detectCores()
+)
+
+results_output_pert <- mclapply(data_list_mc, function(dataList) {
+  sData <- dataList$sDat
+  tData <- dataList$tDat
+  piVal <- n/(n+m)
+  ispar <- T
+  
+  fityx <- lm(Y~., data = as.data.frame(sData))
+  coef_y_x_s_hat <- coef(fityx)
+  sigma_y_x_s_hat <- sigma(fityx)
+  
+  Mu_Y_S_hat <- mean(sData[,"Y"])
+  Sig_Y_S_hat <- sd(sData[,"Y"])
+  GH_Materials <- list(y_vec = sData[,"Y"], mu = Mu_Y_S_hat, sigma = Sig_Y_S_hat, xList = xList, wList= wList)
+  
+  thetaHatVec <- numeric(B2)
+  for (i in 1:B2)
+  {
+    rexpVec <- rexpVec_list[[i]]
+    betaHat <- optim(beta_rho, EstimateBetaFuncPert_CPP, sData = sData, tData = tData, piVal = piVal,
+                     tDat_ext = tData, coef_y_x_s = coef_y_x_s_hat, sigma_y_x_s = sigma_y_x_s_hat, ispar = ispar,
+                     parameters = GH_Materials, xList = xList, wList = wList, rexpVec = rexpVec)
+    betaHat <- betaHat$par
+    
+    num_of_target <- m
+    yVec <- sData[,"Y"]
+    rhoValSource <- exp(c(cbind(yVec, yVec^2) %*% matrix(betaHat, ncol = 1)))
+    c_ps <- E_S_RHO_CPP(betaHat, ispar, GH_Materials)
+    e_s_rho_x_ext <- E_S_RHO_X_CPP(betaHat, 1, tData, coef_y_x_s_hat,
+                                   sigma_y_x_s_hat, xList, wList)
+    e_s_rho2_x_ext <- E_S_RHO_X_CPP(betaHat, 2, tData, coef_y_x_s_hat,
+                                    sigma_y_x_s_hat, xList, wList)
+    e_t_tau <- E_T_TAU_CPP(e_s_rho_x = e_s_rho_x_ext, e_s_rho2_x = e_s_rho2_x_ext, c_ps = c_ps, piVal = piVal)
+    tau_x_external <- COMPUTE_TAU_CPP(e_s_rho_x_ext, e_s_rho2_x_ext, c_ps, piVal)
+    
+    xMatAll <- rbind(sData[,-1], tData)
+    e_s_rho_x_all <- E_S_RHO_X_CPP(betaHat, 1, xMatAll, coef_y_x_s_hat,
+                                   sigma_y_x_s_hat, xList, wList)
+    e_s_rho2_x_all <- E_S_RHO_X_CPP(betaHat, 2, xMatAll, coef_y_x_s_hat,
+                                    sigma_y_x_s_hat, xList, wList)
+    tau_x_internal_all <- COMPUTE_TAU_CPP(e_s_rho_x_all, e_s_rho2_x_all, c_ps, piVal)
+    e_s_rho2_psi_x_internal_all <- E_S_RHO2_PSI_X_CPP(betaHat, xMatAll, coef_y_x_s_hat, sigma_y_x_s_hat, xList, wList)
+    e_s_rho2_psi_x_external <- E_S_RHO2_PSI_X_CPP(betaHat, tData, coef_y_x_s_hat, sigma_y_x_s_hat, xList, wList)
+    MatInv <- EstimateBetaCovMat_CPP(betaHat, sData, tData, piVal, tData,
+                                     coef_y_x_s_hat, sigma_y_x_s_hat, ispar, GH_Materials,
+                                     xList, wList)
+    e_s_rho2_psi_x_internal_source <- E_S_RHO2_PSI_X_CPP(betaHat, sData[,-1], coef_y_x_s_hat, sigma_y_x_s_hat, xList, wList)
+    e_s_rho2_x_internal_source <- E_S_RHO_X_CPP(betaHat, 2, sData[,-1], coef_y_x_s_hat, sigma_y_x_s_hat, xList, wList)
+    e_s_rho_x_internal_source <- E_S_RHO_X_CPP(betaHat, 1, sData[,-1], coef_y_x_s_hat, sigma_y_x_s_hat, xList, wList)
+    tau_for_x_source <- COMPUTE_TAU_CPP(e_s_rho_x = e_s_rho_x_internal_source, e_s_rho2_x = e_s_rho2_x_internal_source, c_ps = c_ps, piVal = piVal)
+    
+    SEff <- ComputeEfficientScore_CPP(betaHat, sData, tData, piVal, tData,
+                                      coef_y_x_s_hat, sigma_y_x_s_hat, ispar, GH_Materials,
+                                      xList, wList)
+    
+    thetaHat <- COMPUTE_THETA_Pert_CPP(num_of_target, piVal, rhoValSource, c_ps, yVec,
+                                       betaHat, e_t_tau, tau_x_internal_all, tau_x_external,
+                                       e_s_rho2_psi_x_internal_all, e_s_rho2_x_all,
+                                       e_s_rho2_psi_x_external, e_s_rho2_x_ext, rexpVec = rexpVec)
+    thetaHatVec[i] <- thetaHat
+  }
+  return(sd(thetaHatVec))
+},
+mc.cores = detectCores()
+)
