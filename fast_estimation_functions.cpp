@@ -699,36 +699,3 @@ double COMPUTE_THETA_NAIVE(NumericVector betaHat, NumericVector rhoValSource,
   
   return out;
 }
-
-// [[Rcpp::export]]
-
-double COMPUTE_EFFICIENT_IF_FOR_THETA_OPTIM_CPP(double theta,
-                                               int num_of_target,
-                                               double piVal, NumericVector rhoValSource,
-                                               double c_ps, NumericVector yVec,
-                                               NumericVector beta_rho, double e_t_tau,
-                                               NumericVector tau_x_internal_all,
-                                               NumericVector tau_x_external,
-                                               NumericVector e_s_rho2_psi_x_internal_all,
-                                               NumericVector e_s_rho2_x_internal_all,
-                                               NumericVector e_s_rho2_psi_x_external,
-                                               NumericVector e_s_rho2_x_external,
-                                               NumericMatrix MatInv,
-                                               bool ispar, List parameters,
-                                               NumericMatrix sData,
-                                               NumericVector coef_y_x_s, double sigma_y_x_s,
-                                               NumericVector e_s_rho2_psi_x_internal_source,
-                                               NumericVector e_s_rho2_x_internal_source,
-                                               NumericVector tau_for_x_source,
-                                               NumericVector e_s_rho_x_source,
-                                               NumericVector xList, NumericVector wList,
-                                               NumericMatrix SEff) {
-  NumericVector Phi_Theta = COMPUTE_EFFICIENT_IF_FOR_THETA_CPP(theta, num_of_target,
-    piVal, rhoValSource, c_ps, yVec, beta_rho, e_t_tau, tau_x_internal_all, tau_x_external,
-    e_s_rho2_psi_x_internal_all, e_s_rho2_x_internal_all, e_s_rho2_psi_x_external,
-    e_s_rho2_x_external, MatInv, ispar, parameters, sData, coef_y_x_s, sigma_y_x_s,
-    e_s_rho2_psi_x_internal_source, e_s_rho2_x_internal_source, tau_for_x_source,
-    e_s_rho_x_source, xList, wList, SEff);
-  double avg = mean(Phi_Theta);
-  return avg*avg;
-}
