@@ -523,19 +523,28 @@ for (filename in filenames)
     x$ThetaHat
   }) -> thetaHatVec
   
+  sdTheta <- sd(thetaHatVec)
+  meanTheta <- mean(thetaHatVec)
+  selected <- (thetaHatVec > meanTheta-3*sdTheta) & (thetaHatVec < meanTheta+3*sdTheta)
+  thetaHatVec <- thetaHatVec[selected]
+  
   sapply(richInfo, function(x) {
     x$ThetaNaive
   }) -> thetaHatNaiveVec
+  thetaHatNaiveVec <- thetaHatNaiveVec[selected]
   
   sapply(richInfo, function(x) {
     x$SdHat
   }) -> sdHatVec
+  sdHatVec <- sdHatVec[selected]
   
   sapply(richInfo, function(x) {
     x$CP
   }) -> CPVec
+  CPVec <- CPVec[selected]
   
   sdPertVec <- rtDat$Sd
+  sdPertVec <- sdPertVec[selected]
   
   # Bias of the efficient estimator
   biasEff <- mean(thetaHatVec) - Mu_Y_T
@@ -661,4 +670,4 @@ outCP$Method <-
 outCP %>% ggplot(aes(x = n, y = CP)) + geom_line(aes(col = Method, linetype = Method)) +
   geom_point(aes(col = Method, shape = Method)) + facet_wrap( ~ ratio, nrow = 1, labeller = labeller(ratio = c(
     "0.5" = "m/n=0.5", "1" = "m/n=1", "1.5" = "m/n=1.5"
-  ))) + geom_hline(aes(yintercept = 0.95), linetype = "dashed") + ylab("Coverage Probability")
+  ))) + geom_hline(aes(yintercept = 0.95), linetype = "dashed") + ylab("Coverage Probability")+ylim(c(0.9, 1))
