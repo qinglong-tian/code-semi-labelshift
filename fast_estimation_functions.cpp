@@ -733,3 +733,49 @@ double COMPUTE_THETA_Pert_CPP(int num_of_target,
   
   return Theta;
 }
+
+// [[Rcpp::export]]
+NumericMatrix Compute_Naive_S(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData, double c_ps, double piVal)
+{
+  int num_of_source = sData.nrow();
+  int num_of_target = tData.nrow();
+  
+  int i;
+  double rho_y;
+  NumericMatrix outMat(num_of_source+num_of_target, 2);
+  
+  for(i=0;i<num_of_source;i++)
+  {
+    rho_y = exp(beta_rho(0)*sData(i,0)+beta_rho(1)*sData(i,0)*sData(i,0));
+    outMat(i,0) = rho_y/piVal/c_ps*sData(i,1);
+    outMat(i,1) = rho_y/piVal/c_ps*sData(i,2);
+  }
+  
+  for(i=0;i<num_of_target;i++)
+  {
+    outMat(i+num_of_source,0) = -1/(1-piVal)*tData(i,0);
+    outMat(i+num_of_source,1) = -1/(1-piVal)*tData(i,1);
+  }
+  
+  return outMat;
+}
+
+// [[Rcpp::export]]
+double Estimate_Naive_Beta(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData, double piVal, bool ispar, List parameters)
+{
+  double c_ps = E_S_RHO_CPP(beta_rho, ispar, parameters);
+  NumericMatrix Naive_Mat = Compute_Naive_S(beta_rho, sData, tData, c_ps, piVal);
+  int num_of_total = Naive_Mat.nrow();
+  double total1 = 0, total2 = 0;
+  for(int i=0; i<num_of_total; i++)
+  {
+    total1 += Naive_Mat(i,0);
+    total2 += Naive_Mat(i,1);
+  }
+  total1 /= num_of_total;
+  total2 /= num_of_total;
+  
+  double out = total1*total1+total2*total2;
+  
+  return out;
+}
