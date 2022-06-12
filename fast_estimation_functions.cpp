@@ -744,17 +744,19 @@ NumericMatrix Compute_Naive_S(NumericVector beta_rho, NumericMatrix sData, Numer
   double rho_y;
   NumericMatrix outMat(num_of_source+num_of_target, 2);
   
+  NumericVector X_t_Mean = colMeans(tData);
+  
   for(i=0;i<num_of_source;i++)
   {
     rho_y = exp(beta_rho(0)*sData(i,0)+beta_rho(1)*sData(i,0)*sData(i,0));
-    outMat(i,0) = rho_y/piVal/c_ps*sData(i,1);
-    outMat(i,1) = rho_y/piVal/c_ps*sData(i,2);
+    outMat(i,0) = rho_y/piVal/c_ps*(sData(i,1)-X_t_Mean(0));
+    outMat(i,1) = rho_y/piVal/c_ps*(sData(i,2)-X_t_Mean(1));
   }
   
   for(i=0;i<num_of_target;i++)
   {
-    outMat(i+num_of_source,0) = -1/(1-piVal)*tData(i,0);
-    outMat(i+num_of_source,1) = -1/(1-piVal)*tData(i,1);
+    outMat(i+num_of_source,0) = -1/(1-piVal)*(tData(i,0)-X_t_Mean(0));
+    outMat(i+num_of_source,1) = -1/(1-piVal)*(tData(i,1)-X_t_Mean(1));
   }
   
   return outMat;
@@ -764,6 +766,7 @@ NumericMatrix Compute_Naive_S(NumericVector beta_rho, NumericMatrix sData, Numer
 double Estimate_Naive_Beta(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData, double piVal, bool ispar, List parameters)
 {
   double c_ps = E_S_RHO_CPP(beta_rho, ispar, parameters);
+  
   NumericMatrix Naive_Mat = Compute_Naive_S(beta_rho, sData, tData, c_ps, piVal);
   int num_of_total = Naive_Mat.nrow();
   double total1 = 0, total2 = 0;
@@ -778,4 +781,90 @@ double Estimate_Naive_Beta(NumericVector beta_rho, NumericMatrix sData, NumericM
   double out = total1*total1+total2*total2;
   
   return out;
+}
+
+// [[Rcpp::export]]
+NumericMatrix Compute_Derivative_Mat(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData, bool ispar, List parameters)
+{
+  int num_of_source = sData.nrow();
+  double c_ps = E_S_RHO_CPP(beta_rho, ispar, parameters);
+  NumericVector rho_vec(num_of_source), y_vec = sData( _ , 0), x1_vec_s = sData( _ , 1), x2_vec_s = sData( _ , 2);
+  
+  int num_of_target = tData.nrow();
+  NumericVector x1_vec_t = tData( _ , 0), x2_vec_t= tData( _ , 1);
+  
+  for (int i=0; i<num_of_source; i++)
+  {
+    rho_vec(i) = exp(beta_rho(0)*y_vec(i)+beta_rho(1)*y_vec(i)*y_vec(i));
+  }
+  
+  double e_s_rho_y_x1 = 0, e_s_rho_y = 0, e_s_rho_x1 = 0, e_s_rho_y2_x1 = 0, e_s_rho_y2 = 0, e_s_rho_y_x2 = 0, e_s_rho_x2 = 0, e_s_rho_y2_x2= 0;
+  for (int i=0; i<num_of_source; i++)
+  {
+    e_s_rho_y_x1 += rho_vec(i)*y_vec(i)*x1_vec_s(i);
+    e_s_rho_y += rho_vec(i)*y_vec(i);
+    e_s_rho_x1 += rho_vec(i)*x1_vec_s(i);
+    e_s_rho_y2_x1 += rho_vec(i)*y_vec(i)*y_vec(i)*x1_vec_s(i);
+    e_s_rho_y2 += rho_vec(i)*y_vec(i)*y_vec(i);
+    e_s_rho_y_x2 += rho_vec(i)*y_vec(i)*x2_vec_s(i);
+    e_s_rho_x2 += rho_vec(i)*x2_vec_s(i);
+    e_s_rho_y2_x2 += rho_vec(i)*y_vec(i)*y_vec(i)*x2_vec_s(i);
+  }
+  e_s_rho_y_x1 /= num_of_source;
+  e_s_rho_y /= num_of_source;
+  e_s_rho_x1 /= num_of_source;
+  e_s_rho_y2_x1 /= num_of_source;
+  e_s_rho_y2 /= num_of_source;
+  e_s_rho_y_x2 /= num_of_source;
+  e_s_rho_x2 /= num_of_source;
+  e_s_rho_y2_x2 /= num_of_source;
+  
+  NumericMatrix e_dm_dbeta(2,2);
+  e_dm_dbeta(0,0) = (e_s_rho_y_x1*c_ps-e_s_rho_y*e_s_rho_x1)/(c_ps*c_ps);
+  e_dm_dbeta(0,1) = (e_s_rho_y2_x1*c_ps-e_s_rho_y2*e_s_rho_x1)/(c_ps*c_ps);
+  e_dm_dbeta(1,0) = (e_s_rho_y_x2*c_ps-e_s_rho_y*e_s_rho_x2)/(c_ps*c_ps);
+  e_dm_dbeta(1,1) = (e_s_rho_y2_x2*c_ps-e_s_rho_y2*e_s_rho_x2)/(c_ps*c_ps);
+  
+  return e_dm_dbeta;
+}
+
+// [[Rcpp::export]]
+NumericMatrix Compute_Var_m(NumericVector beta_rho, NumericMatrix sData, NumericMatrix tData, bool ispar, List parameters, double piVal)
+{
+  int num_of_source = sData.nrow(), num_of_target = tData.nrow();
+  NumericVector rho_vec(num_of_source), y_vec = sData( _ ,0), x_1_vec_s = sData( _ , 1), x_2_vec_s = sData( _ , 2), x_1_vec_t = tData( _ , 0), x_2_vec_t = tData( _ ,1);
+  double c_ps = E_S_RHO_CPP(beta_rho, ispar, parameters);
+  
+  for(int i=0; i<num_of_source; i++){
+    rho_vec(i) = exp(beta_rho(0)*y_vec(i)+beta_rho(1)*y_vec(i)*y_vec(i));
+  }
+  
+  double e_s_rho2_x1_2=0, e_s_rho2_x1_x2=0, e_s_rho2_x2_2=0;
+  for (int i=0; i<num_of_source; i++){
+    e_s_rho2_x1_2 += rho_vec(i)*rho_vec(i)*x_1_vec_s(i)*x_1_vec_s(i);
+    e_s_rho2_x1_x2 += rho_vec(i)*rho_vec(i)*x_1_vec_s(i)*x_2_vec_s(i);
+    e_s_rho2_x2_2 += rho_vec(i)*rho_vec(i)*x_2_vec_s(i)*x_2_vec_s(i);
+  }
+  e_s_rho2_x1_2 /= num_of_source;
+  e_s_rho2_x1_x2 /= num_of_source;
+  e_s_rho2_x2_2 /= num_of_source;
+  
+  double e_t_x1_2 = 0, e_t_x1_x2 = 0, e_t_x2_2 = 0;
+  for(int i=0; i<num_of_target; i++)
+  {
+    e_t_x1_2 += x_1_vec_t(i)*x_1_vec_t(i);
+    e_t_x1_x2 += x_1_vec_t(i)*x_2_vec_t(i);
+    e_t_x2_2 += x_2_vec_t(i)*x_2_vec_t(i);
+  }
+  e_t_x1_2 /= num_of_target;
+  e_t_x1_x2 /= num_of_target;
+  e_t_x2_2 /= num_of_target;
+  
+  NumericMatrix EmmT(2,2);
+  EmmT(0,0) = 1/piVal*e_s_rho2_x1_2/c_ps/c_ps+1/(1-piVal)*e_t_x1_2;
+  EmmT(0,1) = 1/piVal*e_s_rho2_x1_x2/c_ps/c_ps+1/(1-piVal)*e_t_x1_x2;
+  EmmT(1,0) = EmmT(0,1);
+  EmmT(1,1) = 1/piVal*e_s_rho2_x2_2/c_ps/c_ps+1/(1-piVal)*e_t_x2_2;
+  
+  return EmmT;
 }
