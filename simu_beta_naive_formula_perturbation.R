@@ -11,7 +11,7 @@ sourceCpp("fast_estimation_functions.cpp")
 # Data Generating Parameters
 Mu_YX <- c(2, 1, 1, 1)
 SigMat_YX <- ar1_cor(4, 0.9)
-SigMat_YX[-1, -1] <- ar1_cor(3, 0.3)
+SigMat_YX[-1,-1] <- ar1_cor(3, 0.3)
 SigMat_YX <- SigMat_YX + 0.1 * diag(4)
 SigMat_YX[1, 1] <- 1.44
 Mu_Y_T <- 1.5
@@ -28,8 +28,8 @@ sigma_y_x_s_true <- sqrt(var_y_x_s_true)
 
 ################################################
 beta_rho <- trueBetaRho
-B1 <- 20 # Monte-Carlo Sample Size
-B2 <- 50
+B1 <- 100 # Monte-Carlo Sample Size
+B2 <- 500
 
 gh_num <- 12
 ghxw <- gaussHermiteData(gh_num)
@@ -37,8 +37,10 @@ xList <- ghxw$x
 wList <- ghxw$w
 ################################################
 set.seed(888)
-n_vector <- c(200, 400, 600, 800, 1000)
-mnratio_vec <- c(0.5, 1, 1.5)
+n_vector <- c(1000)
+mnratio_vec <- c(1)
+
+t0 <- Sys.time()
 ################################################
 for (n in n_vector)
 {
@@ -119,8 +121,8 @@ for (n in n_vector)
                     nrow = 2,
                     ncol = 2,
                     byrow = T)
-      Sd1[1, ] <- -1.96 * Sd1[1, ]
-      Sd1[2, ] <- 1.96 * Sd1[2, ]
+      Sd1[1,] <- -1.96 * Sd1[1,]
+      Sd1[2,] <- 1.96 * Sd1[2,]
       CI1 <- CI1 + Sd1
       
       CP1 <-
@@ -158,8 +160,8 @@ for (n in n_vector)
                     ncol = 2,
                     byrow = T)
       
-      Sd2[1, ] <- -1.96 * Sd2[1, ]
-      Sd2[2, ] <- +1.96 * Sd2[2, ]
+      Sd2[1,] <- -1.96 * Sd2[1,]
+      Sd2[2,] <- +1.96 * Sd2[2,]
       CI2 <- CI2 + Sd2
       
       CP2 <-
@@ -181,7 +183,8 @@ for (n in n_vector)
           CPNaive = CP2
         )
       )
-    })
+    },
+    mc.cores = detectCores())
     
     results_output_pert <-
       mclapply(data_list_mc, function(dataList) {
@@ -206,7 +209,7 @@ for (n in n_vector)
             wList = wList
           )
         
-        betaVec <- numeric(B2)
+        betaVec <- matrix(nrow = B2, ncol = 2)
         for (j in 1:B2)
         {
           rexpVec <- rexpVec_list[[j]]
@@ -226,17 +229,79 @@ for (n in n_vector)
               wList = wList,
               rexpVec = rexpVec
             )
-          betaVec[j] <- betaHatPert$par
+          betaVec[j,] <- betaHatPert$par
         }
         
         return(betaVec)
-      })
+      },
+      mc.cores = detectCores())
     
-    outList <- list(Out1 = results_output, Out2 = results_output_pert)
-    saveRDS(outList, file = paste("dat3/n_", n, "_ratio_", mnratio, "_.RDS", sep = ""))
+    outList <-
+      list(Out1 = results_output, Out2 = results_output_pert)
+    saveRDS(outList,
+            file = paste("dat3/n_", n, "_ratio_", mnratio, "_.RDS", sep = ""))
   }
 }
 
+Sys.time() - t0
 #####################################
 # Process Results
 #####################################
+
+read_in_data <- function(filename, dir) {
+  rt <- str_match(filename, "ratio_(.*?)_")[2] %>% as.numeric()
+  n <- str_match(filename, "n_(.*?)_ratio")[2] %>% as.numeric()
+  dat <- readRDS(paste(dir, filename, sep = ""))
+  
+  return(list(rt = rt, dat = dat, n = n))
+}
+
+dir_to_dat <- "dat3/"
+all_filenames <- list.files(dir_to_dat)
+for (filename in all_filenames)
+{
+  infoList <- read_in_data(filename, dir_to_dat)
+  rt <- infoList$rt
+  n <- infoList$n
+  result_list <- infoList$dat
+  
+  firstList <- result_list$Out1
+  secondList <- result_list$Out2
+  
+  PerturbSd <- t(sapply(secondList, function (PertMat) {
+    apply(PertMat, MARGIN = 2, sd)
+  }))
+  
+  BetaHatEffMat <- t(sapply(firstList, function (x) {
+    x$BetaHatEff
+  }))
+  
+  BetaHatNaiveMat <- t(sapply(firstList, function (x) {
+    x$BetaHatNaive
+  }))
+  
+  EffSdMat <- t(sapply(firstList, function (x) {
+    x$SdEff
+  }))
+  
+  NaiveSdMat <- t(sapply(firstList, function (x) {
+    x$SdNaive
+  }))
+  
+  CPEffMat <- t(sapply(firstList, function (x) {
+    x$CPEff
+  }))
+  
+  CPNaiveMat <- t(sapply(firstList, function (x) {
+    x$CPNaive
+  }))
+  
+  CPPert1 <- mean(
+    (trueBetaRho[1] > BetaHatEffMat[, 1] - 1.96 * PerturbSd[, 1]) &
+      (trueBetaRho[1] < BetaHatEffMat[, 1] + 1.96 * PerturbSd[, 1])
+  )
+  CPPert2 <- mean(
+    (trueBetaRho[2] > BetaHatEffMat[, 2] - 1.96 * PerturbSd[, 2]) &
+      (trueBetaRho[2] < BetaHatEffMat[, 2] + 1.96 * PerturbSd[, 2])
+  )
+}
