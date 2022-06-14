@@ -45,12 +45,10 @@ Generate_Binary_Data <- function(n, Mu_X, Sigma_X, alphaVec, gammaVec)
   yVec <- YXMat[,1]
   R <- Generate_R_Given_Y(yVec, gammaVec)
   
-  YXRMat <- cbind(YXMat, R)
+  YXMat1 <- YXMat[R == 1, ]
+  YXMat0 <- YXMat[R == 0, ]
   
-  YXMat1 <- YXRMat[YXRMat[,ncol(YXRMat)] == 1, ]
-  YXMat0 <- YXRMat[YXRMat[,ncol(YXRMat)] == 0, ]
-  
-  return(list(sData = YXMat1[,1:(ncol(YXRMat)-1)], tData = YXMat0[,2:(ncol(YXRMat)-1)], tData_full = YXMat0[,1:(ncol(YXRMat)-1)]))
+  return(list(sData = YXMat1, tData = YXMat0[,-1], tData_full = YXMat0))
 }
 
 Fit_Binary_Y_With_X <- function(YXMat, probit = F)
