@@ -9,7 +9,7 @@ sourceCpp("fast_estimation_functions.cpp")
 # Data Generation #
 Mu_YX <- c(2, 1, 1, 1)
 SigMat_YX <- ar1_cor(4, 0.9)
-SigMat_YX[-1, -1] <- ar1_cor(3, 0.3)
+SigMat_YX[-1,-1] <- ar1_cor(3, 0.3)
 SigMat_YX <- SigMat_YX + 0.1 * diag(4)
 SigMat_YX[1, 1] <- 1.44
 Mu_Y_T <- 1.5
@@ -24,7 +24,7 @@ coef_y_x_s_true <- c(yx_dist$Beta0, yx_dist$Beta1)
 var_y_x_s_true <- yx_dist$VarYX
 sigma_y_x_s_true <- sqrt(var_y_x_s_true)
 ################################################
-B1 <- 1000 # Monte-Carlo Sample Size
+B1 <- 2000 # Monte-Carlo Sample Size
 B2 <- 500
 ################################################
 # Factors #
@@ -126,7 +126,7 @@ for (n in n_vec)
       tau_x_external <-
         COMPUTE_TAU_CPP(e_s_rho_x_ext, e_s_rho2_x_ext, c_ps, piVal)
       
-      xMatAll <- rbind(sData[, -1], tData)
+      xMatAll <- rbind(sData[,-1], tData)
       e_s_rho_x_all <-
         E_S_RHO_X_CPP(betaHat,
                       1,
@@ -175,7 +175,7 @@ for (n in n_vec)
         )
       e_s_rho2_psi_x_internal_source <-
         E_S_RHO2_PSI_X_CPP(betaHat,
-                           sData[, -1],
+                           sData[,-1],
                            coef_y_x_s_hat,
                            sigma_y_x_s_hat,
                            xList,
@@ -183,7 +183,7 @@ for (n in n_vec)
       e_s_rho2_x_internal_source <-
         E_S_RHO_X_CPP(betaHat,
                       2,
-                      sData[, -1],
+                      sData[,-1],
                       coef_y_x_s_hat,
                       sigma_y_x_s_hat,
                       xList,
@@ -191,7 +191,7 @@ for (n in n_vec)
       e_s_rho_x_internal_source <-
         E_S_RHO_X_CPP(betaHat,
                       1,
-                      sData[, -1],
+                      sData[,-1],
                       coef_y_x_s_hat,
                       sigma_y_x_s_hat,
                       xList,
@@ -236,8 +236,22 @@ for (n in n_vec)
           e_s_rho2_x_ext
         )
       
+      betaHatNaive <-
+        optim(
+          beta_rho,
+          Estimate_Naive_Beta,
+          sData = sData,
+          tData = tData,
+          piVal = piVal,
+          ispar = ispar,
+          parameters = GH_Materials
+        )$par
+      c_ps_naive <- E_S_RHO_CPP(betaHatNaive, ispar, GH_Materials)
+      
+      rhoValSource_naive <-
+        exp(c(cbind(yVec, yVec ^ 2) %*% matrix(betaHatNaive, ncol = 1)))
       thetaNHat <-
-        COMPUTE_THETA_NAIVE(betaHat, rhoValSource, yVec, c_ps)
+        COMPUTE_THETA_NAIVE(betaHatNaive, rhoValSource_naive, yVec, c_ps_naive)
       
       Phi_Theta <-
         COMPUTE_EFFICIENT_IF_FOR_THETA_CPP(
@@ -367,7 +381,7 @@ for (n in n_vec)
           tau_x_external <-
             COMPUTE_TAU_CPP(e_s_rho_x_ext, e_s_rho2_x_ext, c_ps, piVal)
           
-          xMatAll <- rbind(sData[, -1], tData)
+          xMatAll <- rbind(sData[,-1], tData)
           e_s_rho_x_all <-
             E_S_RHO_X_CPP(betaHat,
                           1,
@@ -416,7 +430,7 @@ for (n in n_vec)
             )
           e_s_rho2_psi_x_internal_source <-
             E_S_RHO2_PSI_X_CPP(betaHat,
-                               sData[, -1],
+                               sData[,-1],
                                coef_y_x_s_hat,
                                sigma_y_x_s_hat,
                                xList,
@@ -424,7 +438,7 @@ for (n in n_vec)
           e_s_rho2_x_internal_source <-
             E_S_RHO_X_CPP(betaHat,
                           2,
-                          sData[, -1],
+                          sData[,-1],
                           coef_y_x_s_hat,
                           sigma_y_x_s_hat,
                           xList,
@@ -432,7 +446,7 @@ for (n in n_vec)
           e_s_rho_x_internal_source <-
             E_S_RHO_X_CPP(betaHat,
                           1,
-                          sData[, -1],
+                          sData[,-1],
                           coef_y_x_s_hat,
                           sigma_y_x_s_hat,
                           xList,
@@ -525,7 +539,9 @@ for (filename in filenames)
   
   sdTheta <- sd(thetaHatVec)
   meanTheta <- mean(thetaHatVec)
-  selected <- (thetaHatVec > meanTheta-3*sdTheta) & (thetaHatVec < meanTheta+3*sdTheta)
+  selected <-
+    (thetaHatVec > meanTheta - 3 * sdTheta) &
+    (thetaHatVec < meanTheta + 3 * sdTheta)
   thetaHatVec <- thetaHatVec[selected]
   
   sapply(richInfo, function(x) {
@@ -621,7 +637,7 @@ outBias$Method <-
     labels = c("Efficient", "Naive")
   )
 outBias %>% ggplot(aes(x = n, y = Bias)) + geom_line(aes(col = Method, linetype = Method)) +
-  geom_point(aes(col = Method, shape = Method)) + facet_wrap( ~ ratio, nrow = 1, labeller = labeller(ratio = c(
+  geom_point(aes(col = Method, shape = Method)) + facet_wrap(~ ratio, nrow = 1, labeller = labeller(ratio = c(
     "0.5" = "m/n=0.5", "1" = "m/n=1", "1.5" = "m/n=1.5"
   ))) + geom_hline(aes(yintercept = 0), linetype = "dashed")
 
@@ -647,7 +663,7 @@ outSE$Method <-
     )
   )
 outSE %>% ggplot(aes(x = n, y = SE)) + geom_line(aes(col = Method, linetype = Method)) +
-  geom_point(aes(col = Method, shape = Method)) + facet_wrap( ~ ratio, nrow = 1, labeller = labeller(ratio = c(
+  geom_point(aes(col = Method, shape = Method)) + facet_wrap(~ ratio, nrow = 1, labeller = labeller(ratio = c(
     "0.5" = "m/n=0.5", "1" = "m/n=1", "1.5" = "m/n=1.5"
   ))) + ylab("Empirical/Estimated Standard Deviation")
 
@@ -668,6 +684,7 @@ outCP$Method <-
     labels = c("Formula", "Perturbation")
   )
 outCP %>% ggplot(aes(x = n, y = CP)) + geom_line(aes(col = Method, linetype = Method)) +
-  geom_point(aes(col = Method, shape = Method)) + facet_wrap( ~ ratio, nrow = 1, labeller = labeller(ratio = c(
+  geom_point(aes(col = Method, shape = Method)) + facet_wrap(~ ratio, nrow = 1, labeller = labeller(ratio = c(
     "0.5" = "m/n=0.5", "1" = "m/n=1", "1.5" = "m/n=1.5"
-  ))) + geom_hline(aes(yintercept = 0.95), linetype = "dashed") + ylab("Coverage Probability")+ylim(c(0.9, 1))
+  ))) + geom_hline(aes(yintercept = 0.95), linetype = "dashed") + ylab("Coverage Probability") +
+  ylim(c(0.9, 1))
