@@ -9,4 +9,7 @@ E_S_RHO_Binary <- function(betaVal, sData)
   return(out)
 }
 
-
+E_t_RHO_X_Binary <- function(betaVal, xMat, fitted_coef_s)
+{
+  
+}
