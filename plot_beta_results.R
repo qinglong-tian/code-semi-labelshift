@@ -109,14 +109,14 @@ datBeta %>% select(
       "Naive (Empirical)",
       ifelse(
         variable %in% c("b1effpertsd", "b2effpertsd"),
-        "Perturbation (Estimated)",
-        "Formula (Estimated)"
+        "Eff. Perturbation (Est.)",
+        "Eff. Formula (Est.)"
       )
     )
   )
 ) %>% mutate(
   Ratio = factor(Ratio, levels = c('m/n*"=0.5"', 'm/n*"=1"', 'm/n*"=1.5"')),
-  Type = factor(Type, levels = c("Proposed (Empirical)", "Naive (Empirical)", "Perturbation (Estimated)", "Formula (Estimated)"))
+  Type = factor(Type, levels = c("Proposed (Empirical)", "Naive (Empirical)", "Eff. Perturbation (Est.)", "Eff. Formula (Est.)"))
 ) %>% ggplot(
   aes(x = n, y = SE, col = Type)
 ) + geom_line(
