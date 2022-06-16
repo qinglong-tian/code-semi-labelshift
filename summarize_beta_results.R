@@ -82,7 +82,7 @@ Sig_Y_S <- sqrt(SigMat_YX[1, 1])
 trueBetaRho <-
   Compute_Rho_Parameters(Mu_Y_T, Sig_Y_T, Mu_YX, SigMat_YX)
 ##############################
-dat2 <- NULL
+datBeta <- NULL
 col_names <- c(
   "b1eff",
   "b2eff",
@@ -216,7 +216,7 @@ for (filename in all_filenames)
   outVec <- c(outVec, n, rt)
   outVec <- matrix(outVec, nrow = 1)
   
-  dat2 <- rbind(dat2, outVec)
+  datBeta <- rbind(datBeta, outVec)
 }
-colnames(dat2) <- col_names
-dat2 <- as.data.frame(dat2)
+colnames(datBeta) <- col_names
+datBeta <- as.data.frame(datBeta)
