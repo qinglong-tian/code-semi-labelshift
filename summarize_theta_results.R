@@ -24,6 +24,11 @@ remove_outliers_2 <- function(vec)
   return(list(cleaned = out, removed = removed))
 }
 
+compute_mse <- function(vec, trueval)
+{
+  mean((trueval-vec)^2)
+}
+
 dat_dir <- "dat2/"
 filenames <- list.files(dat_dir)
 ###########################################
@@ -47,6 +52,7 @@ for (filename in filenames)
   removed_eff <- eff_outlier$removed
   sdTheta <- sd(thetaHatVec)
   meanTheta <- mean(thetaHatVec)
+  compute_mse(thetaHatVec, Mu_Y_T) -> mse_eff
   
   # Naive Theta
   sapply(richInfo, function(x) {
@@ -57,6 +63,7 @@ for (filename in filenames)
   removed_naive <- naive_outlier$removed
   sdNaiveTheta <- sd(thetaHatNaiveVec)
   meanNaiveTheta <- mean(thetaHatNaiveVec)
+  compute_mse(thetaHatNaiveVec, Mu_Y_T) -> mse_naive
   
   # Use formula: SE
   sapply(richInfo, function(x) {
@@ -112,7 +119,9 @@ for (filename in filenames)
         cpFmla,
         sdMeanSemi,
         cpPert,
-        sdMeanPert
+        sdMeanPert,
+        mse_eff,
+        mse_naive
       )
     )
 }
@@ -127,5 +136,9 @@ colnames(out) <-
     "CPFormula",
     "SDFormula",
     "CPPert",
-    "SDPert"
+    "SDPert",
+    "MSEEff",
+    "MSENaive"
   )
+
+out <- as.data.frame(out)
