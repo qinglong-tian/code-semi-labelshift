@@ -493,7 +493,7 @@ for (n in n_vec)
             )
           thetaHatVec[i] <- thetaHat
         }
-        return(sd(thetaHatVec))
+        return(sd(thetaHatVec, na.rm = T))
       },
       mc.cores = detectCores())
     output <-
@@ -502,119 +502,6 @@ for (n in n_vec)
             file = paste("theta_output_ratio", mnratio, "_n", n, "_.RDS", sep = ""))
   }
 }
-
-################################################
-# Extract Information from the Simulation Results
-################################################
-
-library(dplyr)
-library(stringr)
-Mu_Y_T <- 1.5
-
-read_in_data <- function(filename, dir)
-{
-  rt <- str_match(filename, "ratio(.*?)_n")[2] %>% as.numeric()
-  n <- str_match(filename, "_n(.*?)_.RDS")[2] %>% as.numeric()
-  dat <- readRDS(paste(dir, filename, sep = ""))
-  
-  return(list(rt = rt, dat = dat, n = n))
-}
-
-dat_dir <- "dat2/"
-filenames <- list.files(dat_dir)
-out <- NULL
-
-for (filename in filenames)
-{
-  Dat <- read_in_data(filename, dat_dir)
-  
-  rt <- Dat$rt
-  n <- Dat$n
-  rtDat <- Dat$dat
-  
-  richInfo <- rtDat$Rich
-  sapply(richInfo, function(x) {
-    x$ThetaHat
-  }) -> thetaHatVec
-  
-  sdTheta <- sd(thetaHatVec)
-  meanTheta <- mean(thetaHatVec)
-  selected <-
-    (thetaHatVec > meanTheta - 3 * sdTheta) &
-    (thetaHatVec < meanTheta + 3 * sdTheta)
-  thetaHatVec <- thetaHatVec[selected]
-  
-  sapply(richInfo, function(x) {
-    x$ThetaNaive
-  }) -> thetaHatNaiveVec
-  thetaHatNaiveVec <- thetaHatNaiveVec[selected]
-  
-  sapply(richInfo, function(x) {
-    x$SdHat
-  }) -> sdHatVec
-  sdHatVec <- sdHatVec[selected]
-  
-  sapply(richInfo, function(x) {
-    x$CP
-  }) -> CPVec
-  CPVec <- CPVec[selected]
-  
-  sdPertVec <- rtDat$Sd
-  sdPertVec <- sdPertVec[selected]
-  
-  # Bias of the efficient estimator
-  biasEff <- mean(thetaHatVec) - Mu_Y_T
-  # SE of the efficient estimator
-  seEff <- sd(thetaHatVec)
-  
-  # Bias of the naive estimator
-  biasNaive <- mean(thetaHatNaiveVec) - Mu_Y_T
-  # SE of the naive estimator
-  seNaive <- sd(thetaHatNaiveVec)
-  
-  # Coverage of the Semi-inference
-  cpFmla <- mean(CPVec)
-  # Mean Sd of Semi-inference
-  sdMeanSemi <- mean(sdHatVec)
-  
-  # Coverage using perturbation
-  lwbPert <- thetaHatVec - 1.96 * sdPertVec
-  upbPert <- thetaHatVec + 1.96 * sdPertVec
-  cpPert <-
-    sum(lwbPert < Mu_Y_T & upbPert > Mu_Y_T) / length(thetaHatVec)
-  # Mean Sd of perturbation
-  sdMeanPert <- mean(sdPertVec)
-  
-  out <-
-    rbind(
-      out,
-      c(
-        rt,
-        n,
-        biasEff,
-        seEff,
-        biasNaive,
-        seNaive,
-        cpFmla,
-        sdMeanSemi,
-        cpPert,
-        sdMeanPert
-      )
-    )
-}
-colnames(out) <-
-  c(
-    "ratio",
-    "n",
-    "BiasEff",
-    "SEEff",
-    "BiasNaive",
-    "SENaive",
-    "CPFormula",
-    "SDFormula",
-    "CPPert",
-    "SDPert"
-  )
 
 ################################################
 # Plot Simulation Results
