@@ -45,7 +45,7 @@ datBeta %>% select(b1effbias, b2effbias, b1naivebias, b2naivebias, n, ratio) %>%
   ifelse(ratio == 1, 'm/n*"=1"', 'm/n*"=1.5"')
 )) %>% mutate(Ratio = factor(Ratio, levels = c('m/n*"=0.5"', 'm/n*"=1"', 'm/n*"=1.5"'))) %>% mutate(Method = as.factor(Method)) %>%
   ggplot(aes(x = n, y = Bias, col = Method)) + geom_line(aes(linetype = Method)) +
-  geom_point(aes(shape = Method)) +  facet_grid(parameter ~ Ratio, labeller = label_parsed) +
+  geom_point(aes(shape = Method)) +  facet_grid(parameter ~ Ratio, labeller = label_parsed, scales="free_y") +
   geom_hline(yintercept = 0, linetype = "dashed")
 
 # MSE
