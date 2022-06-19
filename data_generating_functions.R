@@ -157,7 +157,7 @@ Testing_Data_Gen <- function(n, m, Mu_YX, SigMat_YX, trueBetaVal)
   Mu_Y <- Mu_YX[1]
   Var_Y <- SigMat_YX[1,1]
   YTargetDist <- Compute_Target_Y_Marginal(Mu_Y, Var_Y, trueBetaVal)
-  YTargetVec <- Generate_Y_Marginal_Target(m, YTargetDist$Mu, YTargetDist$Var)
+  YTargetVec <- Generate_Y_Marginal_Target(m, YTargetDist$Mu, sqrt(YTargetDist$Var))
   tData <- Generate_X_Given_Y(YTargetVec, X_Given_Y_List)
   
   return(list(sDat = dat,
