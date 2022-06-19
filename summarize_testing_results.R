@@ -11,8 +11,8 @@ read_in_data <- function(filename, dir) {
 dir_to_dat <- "dat4/"
 all_filenames <- list.files(dir_to_dat)
 
-dat4plot <- NULL
-
+dat4plot <- matrix(nrow = length(all_filenames), ncol = 5)
+i <- 1
 for (fname in all_filenames)
 {
   infoList <- read_in_data(fname, dir_to_dat)
@@ -27,8 +27,8 @@ for (fname in all_filenames)
   rejEff <- mean(pEffVec <= 0.05, na.rm = T)
   rejNaive <- mean(pNaiveVec <= 0.05, na.rm = T)
   
-  out <- c(n, ratio, beta1, rejEff, rejNaive)
-  dat4plot <- rbind(dat4plot, out)
+  dat4plot[i,] <- c(n, ratio, beta1, rejEff, rejNaive)
+  i <- i+1
 }
 colnames(dat4plot) <- c("n", "ratio", "beta1", "rejEff", "rejNaive")
 dat4plot <- as.data.frame(dat4plot)
