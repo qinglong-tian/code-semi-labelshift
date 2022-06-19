@@ -7,3 +7,28 @@ read_in_data <- function(filename, dir) {
   
   return(list(rt = rt, dat = dat, n = n, beta1 = beta1))
 }
+
+dir_to_dat <- "dat4/"
+all_filenames <- list.files(dir_to_dat)
+
+dat4plot <- NULL
+
+for (fname in all_filenames)
+{
+  infoList <- read_in_data(fname, dir_to_dat)
+  beta1 <- infoList$beta1
+  n <- infoList$n
+  ratio <- infoList$rt
+  
+  dat <- infoList$dat
+  pEffVec <- sapply(dat, function(x) {x$pValEff})
+  pNaiveVec <- sapply(dat, function(x) {x$pValNaive})
+  
+  rejEff <- mean(pEffVec <= 0.05, na.rm = T)
+  rejNaive <- mean(pNaiveVec <= 0.05, na.rm = T)
+  
+  out <- c(n, ratio, beta1, rejEff, rejNaive)
+  dat4plot <- rbind(dat4plot, out)
+}
+colnames(dat4plot) <- c("n", "ratio", "beta1", "rejEff", "rejNaive")
+dat4plot <- as.data.frame(dat4plot)
