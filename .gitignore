@@ -40,3 +40,6 @@ vignettes/*.pdf
 
 # R Data
 *.RDS
+
+# Hide from Git
+*-Hide.R
