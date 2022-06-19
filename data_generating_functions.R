@@ -138,3 +138,13 @@ Generate_Dat <- function(n, m, Mu_YX, SigMat_YX, Mu_Y_T, Sig_Y_T)
               tDat = xTarget))
 }
 
+Compute_Target_Y_Marginal <- function(Mu_Y, Var_Y, trueBetaVal)
+{
+  beta_1 <- trueBetaVal[1]
+  beta_2 <- trueBetaVal[2]
+  
+  Mu_Star <- (Mu_Y/Var_Y+beta_1)/(1/Var_Y-2*beta_2)
+  Var_Star <- 1/(1/Var_Y-2*beta_2)
+  
+  return(list(Mu = Mu_Star, Var = Var_Star))
+}
