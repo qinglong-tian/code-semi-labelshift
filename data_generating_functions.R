@@ -148,3 +148,18 @@ Compute_Target_Y_Marginal <- function(Mu_Y, Var_Y, trueBetaVal)
   
   return(list(Mu = Mu_Star, Var = Var_Star))
 }
+
+Testing_Data_Gen <- function(n, m, Mu_YX, SigMat_YX, trueBetaVal)
+{
+  dat <- Generate_Y_X_Marginal(n = n, Mu_YX = Mu_YX, SigMat_YX = SigMat_YX)
+  X_Given_Y_List <- Compute_X_Given_Y(Mu_YX, SigMat_YX) 
+  
+  Mu_Y <- Mu_YX[1]
+  Var_Y <- SigMat_YX[1,1]
+  YTargetDist <- Compute_Target_Y_Marginal(Mu_Y, Var_Y, trueBetaVal)
+  YTargetVec <- Generate_Y_Marginal_Target(m, YTargetDist$Mu, YTargetDist$Var)
+  tData <- Generate_X_Given_Y(YTargetVec, X_Given_Y_List)
+  
+  return(list(sDat = dat,
+              tDat = tData))
+}
