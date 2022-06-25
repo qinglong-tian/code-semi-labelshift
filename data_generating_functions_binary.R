@@ -37,10 +37,10 @@ Generate_R_Given_Y <- function(yVec, gammaVec)
   return(RVec)
 }
 
-Generate_Binary_Data <- function(n, Mu_X, Sigma_X, alphaVec, gammaVec)
+Generate_Binary_Data <- function(n, Mu_X, Sigma_X, alphaVec, gammaVec, probit = F)
 {
   xMat <- Generate_X_Joint(n, Mu_X, Sigma_X)
-  YXMat <- Generate_Binary_Y_Given_X(xMat, alphaVec)
+  YXMat <- Generate_Binary_Y_Given_X(xMat, alphaVec, probit)
   
   yVec <- YXMat[,1]
   R <- Generate_R_Given_Y(yVec, gammaVec)
@@ -49,14 +49,4 @@ Generate_Binary_Data <- function(n, Mu_X, Sigma_X, alphaVec, gammaVec)
   YXMat0 <- YXMat[R == 0, ]
   
   return(list(sData = YXMat1, tData = YXMat0[,-1], tData_full = YXMat0))
-}
-
-Fit_Binary_Y_With_X <- function(YXMat, probit = F)
-{
-  link_name <- ifelse(probit, "probit", "logit")
-  fit <-
-    glm(Y ~ .,
-        data = as.data.frame(YXMat),
-        family = binomial(link = link_name))
-  return(fit)
 }
