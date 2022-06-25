@@ -13,8 +13,8 @@ outBias <-
 outBias$Method <-
   factor(
     outBias$Method,
-    levels = c("BiasEff", "BiasNaive"),
-    labels = c("Efficient", "Naive")
+    levels = c("BiasNaive", "BiasEff"),
+    labels = c("Naive", "Proposed")
   )
 outBias %>% ggplot(aes(x = n, y = Bias)) + geom_line(aes(col = Method, linetype = Method)) +
   geom_point(aes(col = Method, shape = Method)) + facet_wrap(~ ratio, nrow = 1, labeller = labeller(ratio = c(
@@ -34,18 +34,27 @@ outSE <-
 outSE$Method <-
   factor(
     outSE$Method,
-    levels = c("SEEff", "SENaive", "SDFormula", "SDPert"),
+    levels = c("SENaive", "SEEff", "SDFormula", "SDPert"),
     labels = c(
-      "Proposed (Empirical)",
-      "Naive (Empirical)",
+      "Naive",
+      "Proposed",
       "Eff. Formula (Est.)",
       "Eff. Perturbation (Est.)"
     )
   )
-outSE %>% ggplot(aes(x = n, y = SE)) + geom_line(aes(col = Method, linetype = Method)) +
-  geom_point(aes(col = Method, shape = Method)) + facet_wrap(~ ratio, nrow = 1, labeller = labeller(ratio = c(
+
+
+outSE %>% filter(
+  Method %in% c("Proposed", "Naive")
+) %>% ggplot(
+  aes(x = n, y = SE)
+) + geom_line(
+  aes(col = Method, linetype = Method)
+) + geom_point(
+  aes(col = Method, shape = Method)
+) + facet_wrap( ~ ratio, nrow = 1, labeller = labeller(ratio = c(
     "0.5" = "m/n=0.5", "1" = "m/n=1", "1.5" = "m/n=1.5"
-  ))) + ylab("Standard Error")
+  ))) + ylab("Standard Deviation")
 
 # Coverage: Formula vs. Perturbation
 outCP <- out[, c(1, 2, 7, 9)] %>% as.data.frame

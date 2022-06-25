@@ -16,8 +16,8 @@ datBeta %>%
     "beta[2]"
   )) %>% mutate(Method = ifelse(
     variable %in% c("b1effformucp", "b2effformucp"),
-    "Form.",
-    "Pert."
+    "Formula",
+    "Perturbation"
   )) %>% mutate(Ratio = ifelse(
     ratio == 0.5,
     'm/n*"=0.5"',
@@ -39,7 +39,7 @@ datBeta %>% select(b1effbias, b2effbias, b1naivebias, b2naivebias, n, ratio) %>%
   variable %in% c("b1effbias", "b1naivebias"),
   "beta[1]",
   "beta[2]"
-)) %>% mutate(Method = ifelse(variable %in% c("b1effbias", "b2effbias"), "Efficient", "Naive")) %>% mutate(Ratio = ifelse(
+)) %>% mutate(Method = ifelse(variable %in% c("b1effbias", "b2effbias"), "Proposed", "Naive")) %>% mutate(Ratio = ifelse(
   ratio == 0.5,
   'm/n*"=0.5"',
   ifelse(ratio == 1, 'm/n*"=1"', 'm/n*"=1.5"')
@@ -128,3 +128,69 @@ datBeta %>% select(
   labeller = label_parsed,
   scales="free_y"
 ) + ylab("Standard Error")
+
+# SE
+datBeta %>% select(
+  b1effse,
+  b2effse,
+  b1naivese,
+  b2naivese,
+  b1effpertsd,
+  b2effpertsd,
+  b1effformusd,
+  b2effformusd,
+  n,
+  ratio
+) %>% melt(
+  value.name = "SE",
+  measure.vars = c(
+    "b1effse",
+    "b2effse",
+    "b1naivese",
+    "b2naivese",
+    "b1effpertsd",
+    "b2effpertsd",
+    "b1effformusd",
+    "b2effformusd"
+  ),
+  id.vars = c("n", "ratio")
+) %>% mutate(
+  parameter = ifelse(
+    variable %in% c("b1effse", "b1naivese", "b1effpertsd", "b1effformusd"),
+    "beta[1]",
+    "beta[2]"
+  ),
+  Ratio = ifelse(
+    ratio == 0.5,
+    'm/n*"=0.5"',
+    ifelse(ratio == 1, 'm/n*"=1"', 'm/n*"=1.5"')
+  ),
+  Type = ifelse(
+    variable %in% c("b1effse", "b2effse"),
+    "Proposed",
+    ifelse(
+      variable %in% c("b1naivese", "b2naivese"),
+      "Naive",
+      ifelse(
+        variable %in% c("b1effpertsd", "b2effpertsd"),
+        "Eff. Perturbation (Est.)",
+        "Eff. Formula (Est.)"
+      )
+    )
+  )
+) %>% mutate(
+  Ratio = factor(Ratio, levels = c('m/n*"=0.5"', 'm/n*"=1"', 'm/n*"=1.5"')),
+  Type = factor(Type, levels = c("Naive", "Proposed", "Eff. Perturbation (Est.)", "Eff. Formula (Est.)"))
+) -> tmp
+
+tmp %>% filter(Type %in% c("Proposed", "Naive")) %>%  ggplot(
+  aes(x = n, y = SE, col = Type)
+) + geom_line(
+  aes(linetype = Type)
+) + geom_point(
+  aes(shape = Type)
+) + facet_grid(
+  parameter ~ Ratio,
+  labeller = label_parsed,
+  scales="free_y"
+) + ylab("Standard Deviation")
