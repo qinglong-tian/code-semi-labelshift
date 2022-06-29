@@ -1,3 +1,5 @@
+library(e1071)
+library(caret)
 # Just a glm
 Fit_Binary_Y_With_X <- function(YXMat, probit = F)
 {
@@ -20,7 +22,8 @@ E_S_RHO_Binary <- function(betaVal, sData)
   return(out)
 }
 
-Generate_Y_Given_X <- function(xMat, sData, Method)
+
+Generate_Y_Given_X <- function(xMat, sData, Method = "logit")
 {
   if (Method == "logit" | Method == "probit")
   {
@@ -31,11 +34,31 @@ Generate_Y_Given_X <- function(xMat, sData, Method)
     probVec <-
       predict.glm(fglm, as.data.frame(xMat), type = "response")
   }
-  
+  else if (Method == "nb")
+  {
+    nbFit <-
+      train(sData[, -1],
+            as.factor(sData[, "Y"]),
+            'nb',
+            trControl = trainControl(method = 'cv', number = 10))
+    probVec <- predict(nbFit, xMat, type = "prob")[, 2]
+  }
+  else if (Method == "rf")
+  {
+    control <- trainControl(method="repeatedcv", number=10, repeats=3, search="random")
+    metric <- "Accuracy"
+    sData <- as.data.frame(sData)
+    sData[,"Y"] <- as.factor(sData[,"Y"])
+    rfFit <- train(Y~.,
+                   data = sData,
+                   method = 'rf',
+                   metric=metric, tuneLength=15, trControl=control)
+    probVec <- predict(rfFit, xMat, type = "prob")[, 2]
+  }
   return(probVec)
 }
 
-E_S_RHO_Given_X_Binary_ <- function(betaVal, yFittedGivenX, pwr)
+E_S_RHO_Given_X_Binary <- function(betaVal, yFittedGivenX, pwr)
 {
   prY1 <- yFittedGivenX
   prY0 <- 1 - prY1
@@ -45,36 +68,25 @@ E_S_RHO_Given_X_Binary_ <- function(betaVal, yFittedGivenX, pwr)
   return(out)
 }
 
-E_S_RHO_Given_X_Binary <-
-  function(betaVal, xMat, sData, pwr, Method)
-  {
-    yFittedGivenX <- Generate_Y_Given_X(xMat, sData, Method)
-    out <- E_S_RHO_Given_X_Binary_(betaVal, yFittedGivenX, pwr)
-    
-    return(out)
-  }
-
 E_T_RHO_Given_X_Binary <-
-  function(betaVal, xMat, sData, Method)
+  function(betaVal, yFittedGivenX)
   {
     es2 <-
-      E_S_RHO_Given_X_Binary(betaVal, xMat, sData, 2, Method)
+      E_S_RHO_Given_X_Binary(betaVal, yFittedGivenX, 2)
     es <-
-      E_S_RHO_Given_X_Binary(betaVal, xMat, sData, 1, Method)
+      E_S_RHO_Given_X_Binary(betaVal, yFittedGivenX, 1)
     
     return(es2 / es)
   }
 
 Compute_Tau_Binary <-
   function(betaVal,
-           xMat,
-           sData,
+           yFittedGivenX,
            c_ps,
-           piVal,
-           Method)
+           piVal)
   {
     e_t_rho_given_x <-
-      E_T_RHO_Given_X_Binary(betaVal, xMat, sData, Method)
+      E_T_RHO_Given_X_Binary(betaVal, yFittedGivenX)
     tmp <- e_t_rho_given_x / piVal / c_ps
     
     return(tmp / (tmp + 1 / (1 - piVal)))
@@ -82,9 +94,9 @@ Compute_Tau_Binary <-
 
 # For computing function S
 E_S_RHO_Y_Given_X_Binary <-
-  function(betaVal, xMat, sData, Method)
+  function(betaVal, yFittedGivenX)
   {
-    probVec <- Generate_Y_Given_X(xMat, sData, Method)
+    probVec <- yFittedGivenX
     pr1 <- probVec
     pr1 * 1 * exp(1 * betaVal) + (1 - pr1) * 0 * exp(0 * betaVal)
   }
@@ -98,15 +110,14 @@ E_S_RHO_Y_Binary <- function(betaVal, sData)
 
 Compute_S_Binary <-
   function(betaVal,
-           xMat,
+           yFittedGivenX,
            sData,
-           c_ps,
-           Method)
+           c_ps)
   {
     e_s_rho_y_given_x <-
-      E_S_RHO_Y_Given_X_Binary(betaVal, xMat, sData, Method)
+      E_S_RHO_Y_Given_X_Binary(betaVal, yFittedGivenX)
     e_s_rho_given_x <-
-      E_S_RHO_Given_X_Binary(betaVal, xMat, sData, 1, Method)
+      E_S_RHO_Given_X_Binary(betaVal, yFittedGivenX, 1)
     e_s_rho_y <- E_S_RHO_Y_Binary(betaVal, sData)
     
     e_s_rho_y_given_x / e_s_rho_given_x - e_s_rho_y / c_ps
@@ -114,59 +125,58 @@ Compute_S_Binary <-
 
 E_T_Tau_S_Binary <-
   function(betaVal,
-           xMat_t,
+           yFittedGivenX_tDat,
            sData,
            c_ps,
-           piVal,
-           Method)
+           piVal)
   {
     SVec <-
-      Compute_S_Binary(betaVal, xMat_t, sData, c_ps, Method)
+      Compute_S_Binary(betaVal, yFittedGivenX_tDat, sData, c_ps)
     rhoVec <-
-      Compute_Tau_Binary(betaVal, xMat_t, sData, c_ps, piVal, Method)
+      Compute_Tau_Binary(betaVal, yFittedGivenX_tDat, c_ps, piVal)
     mean(SVec * rhoVec)
   }
 
 E_T_Tau_Binary <-
-  function(betaVal, xMat_t, sData, c_ps, piVal, Method)
+  function(betaVal, yFittedGivenX_tDat, c_ps, piVal)
   {
-    mean(Compute_Tau_Binary(betaVal, xMat_t, sData, c_ps, piVal, Method))
+    mean(Compute_Tau_Binary(betaVal, yFittedGivenX_tDat, c_ps, piVal))
   }
 
 Compute_B_Binary <-
   function(betaVal,
-           xMat,
+           yFittedGivenX,
+           yFittedGivenX_tDat,
            sData,
-           xMat_t,
            c_ps,
-           piVal,
-           Method)
+           piVal)
   {
     tau_x <-
-      Compute_Tau_Binary(betaVal, xMat, sData, c_ps, piVal, Method)
-    s_x <- Compute_S_Binary(betaVal, xMat, sData, c_ps, Method)
+      Compute_Tau_Binary(betaVal, yFittedGivenX, c_ps, piVal)
+    s_x <- Compute_S_Binary(betaVal, yFittedGivenX, sData, c_ps)
     e_t_tau_s <-
-      E_T_Tau_S_Binary(betaVal, xMat_t, sData, c_ps, piVal, Method)
+      E_T_Tau_S_Binary(betaVal, yFittedGivenX_tDat, sData, c_ps, piVal)
     e_t_tau <-
-      E_T_Tau_Binary(betaVal, xMat_t, sData, c_ps, piVal, Method)
+      E_T_Tau_Binary(betaVal, yFittedGivenX_tDat, c_ps, piVal)
     return(-1 * (1 - piVal) * (1 - tau_x) * (s_x - e_t_tau_s / (e_t_tau -
                                                                   1)))
   }
 
 Compute_S_Eff_Binary <-
-  function(betaVal, tData, sData, c_ps, piVal, Method)
+  function(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
   {
     # Labeled Data
     yVec <- sData[, "Y"]
     rhoVec <- exp(betaVal * yVec)
     mult1 <- 1 / piVal * rhoVec / c_ps
+    
     b1 <-
-      Compute_B_Binary(betaVal, sData[,-1], sData, tData, c_ps, piVal, Method)
+      Compute_B_Binary(betaVal, yFittedGivenX, yFittedGivenX_tDat, sData, c_ps, piVal)
     
     # Unlabeled Data
     mult2 <- -1 / (1 - piVal)
     b2 <-
-      Compute_B_Binary(betaVal, tData, sData, tData, c_ps, piVal, Method)
+      Compute_B_Binary(betaVal, yFittedGivenX_tDat, yFittedGivenX_tDat, sData, c_ps, piVal)
     
     S_Eff <- c(mult1 * b1, mult2 * b2)
     
@@ -174,9 +184,9 @@ Compute_S_Eff_Binary <-
   }
 
 Compute_S_Eff_Sum <-
-  function(betaVal, tData, sData, c_ps, piVal, Method)
+  function(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
   {
     S_Eff <-
-      Compute_S_Eff_Binary(betaVal, tData, sData, c_ps, piVal, Method)
+      Compute_S_Eff_Binary(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
     return(mean(S_Eff) ^ 2)
   }
