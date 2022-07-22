@@ -23,47 +23,56 @@ E_S_RHO_Binary <- function(betaVal, sData)
 }
 
 
-Generate_Y_Given_X <- function(xMats, xMatt, sData, Method = "logit")
-{
-  if (Method == "logit" | Method == "probit")
+Generate_Y_Given_X <-
+  function(xMats, xMatt, sData, Method = "logit")
   {
-    fglm <-
-      glm(Y ~ .,
-          family = binomial(link = Method),
-          data = as.data.frame(sData))
-    probVecs <-
-      predict.glm(fglm, as.data.frame(xMats), type = "response")
-    probVect <- 
-      predict.glm(fglm, as.data.frame(xMatt), type = "response")
+    if (Method == "logit" | Method == "probit")
+    {
+      fglm <-
+        glm(Y ~ .,
+            family = binomial(link = Method),
+            data = as.data.frame(sData))
+      probVecs <-
+        predict.glm(fglm, as.data.frame(xMats), type = "response")
+      probVect <-
+        predict.glm(fglm, as.data.frame(xMatt), type = "response")
+    }
+    else if (Method == "nb")
+    {
+      nbFit <-
+        train(sData[, -1],
+              as.factor(sData[, "Y"]),
+              'nb',
+              trControl = trainControl(method = 'cv', number = 10))
+      probVecs <- predict(nbFit, xMats, type = "prob")[, 2]
+      probVect <- predict(nbFit, xMatt, type = "prob")[, 2]
+    }
+    else if (Method == "rf")
+    {
+      control <-
+        trainControl(
+          method = "repeatedcv",
+          number = 10,
+          repeats = 3,
+          search = "random"
+        )
+      metric <- "Accuracy"
+      sData <- as.data.frame(sData)
+      sData[, "Y"] <- as.factor(sData[, "Y"])
+      rfFit <- train(
+        Y ~ .,
+        data = sData,
+        method = 'rf',
+        metric = metric,
+        tuneLength = 15,
+        trControl = control
+      )
+      probVecs <- predict(rfFit, xMats, type = "prob")[, 2]
+      probVect <- predict(rfFit, xMatt, type = "prob")[, 2]
+    }
+    return(list(prob_s = probVecs,
+                prob_t = probVect))
   }
-  else if (Method == "nb")
-  {
-    nbFit <-
-      train(sData[, -1],
-            as.factor(sData[, "Y"]),
-            'nb',
-            trControl = trainControl(method = 'cv', number = 10))
-    probVecs <- predict(nbFit, xMats, type = "prob")[, 2]
-    probVect <- predict(nbFit, xMatt, type = "prob")[, 2]
-  }
-  else if (Method == "rf")
-  {
-    control <- trainControl(method="repeatedcv", number=10, repeats=3, search="random")
-    metric <- "Accuracy"
-    sData <- as.data.frame(sData)
-    sData[,"Y"] <- as.factor(sData[,"Y"])
-    rfFit <- train(Y~.,
-                   data = sData,
-                   method = 'rf',
-                   metric=metric, tuneLength=15, trControl=control)
-    probVecs <- predict(rfFit, xMats, type = "prob")[, 2]
-    probVect <- predict(rfFit, xMatt, type = "prob")[, 2]
-  }
-  return(list(
-    prob_s = probVecs,
-    prob_t = probVect
-  ))
-}
 
 E_S_RHO_Given_X_Binary <- function(betaVal, yFittedGivenX, pwr)
 {
@@ -170,7 +179,12 @@ Compute_B_Binary <-
   }
 
 Compute_S_Eff_Binary <-
-  function(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
+  function(betaVal,
+           sData,
+           c_ps,
+           piVal,
+           yFittedGivenX,
+           yFittedGivenX_tDat)
   {
     # Labeled Data
     yVec <- sData[, "Y"]
@@ -178,12 +192,22 @@ Compute_S_Eff_Binary <-
     mult1 <- 1 / piVal * rhoVec / c_ps
     
     b1 <-
-      Compute_B_Binary(betaVal, yFittedGivenX, yFittedGivenX_tDat, sData, c_ps, piVal)
+      Compute_B_Binary(betaVal,
+                       yFittedGivenX,
+                       yFittedGivenX_tDat,
+                       sData,
+                       c_ps,
+                       piVal)
     
     # Unlabeled Data
     mult2 <- -1 / (1 - piVal)
     b2 <-
-      Compute_B_Binary(betaVal, yFittedGivenX_tDat, yFittedGivenX_tDat, sData, c_ps, piVal)
+      Compute_B_Binary(betaVal,
+                       yFittedGivenX_tDat,
+                       yFittedGivenX_tDat,
+                       sData,
+                       c_ps,
+                       piVal)
     
     S_Eff <- c(mult1 * b1, mult2 * b2)
     
@@ -191,9 +215,38 @@ Compute_S_Eff_Binary <-
   }
 
 Compute_S_Eff_Sum <-
-  function(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
+  function(betaVal,
+           sData,
+           c_ps,
+           piVal,
+           yFittedGivenX,
+           yFittedGivenX_tDat)
   {
     S_Eff <-
-      Compute_S_Eff_Binary(betaVal, sData, c_ps, piVal, yFittedGivenX, yFittedGivenX_tDat)
+      Compute_S_Eff_Binary(betaVal,
+                           sData,
+                           c_ps,
+                           piVal,
+                           yFittedGivenX,
+                           yFittedGivenX_tDat)
     return(mean(S_Eff) ^ 2)
+  }
+
+Compute_SE_Binary <-
+  function(betaVal,
+           sData,
+           c_ps,
+           piVal,
+           yFittedGivenX,
+           yFittedGivenX_tDat)
+  {
+    SEffVec <-
+      Compute_S_Eff_Binary(betaVal,
+                           sData,
+                           c_ps,
+                           piVal,
+                           yFittedGivenX,
+                           yFittedGivenX_tDat)
+    outVar <- 1 / mean(SEffVec ^ 2)
+    sqrt(outVar)
   }
