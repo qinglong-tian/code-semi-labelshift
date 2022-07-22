@@ -23,7 +23,7 @@ E_S_RHO_Binary <- function(betaVal, sData)
 }
 
 
-Generate_Y_Given_X <- function(xMat, sData, Method = "logit")
+Generate_Y_Given_X <- function(xMats, xMatt, sData, Method = "logit")
 {
   if (Method == "logit" | Method == "probit")
   {
@@ -31,8 +31,10 @@ Generate_Y_Given_X <- function(xMat, sData, Method = "logit")
       glm(Y ~ .,
           family = binomial(link = Method),
           data = as.data.frame(sData))
-    probVec <-
-      predict.glm(fglm, as.data.frame(xMat), type = "response")
+    probVecs <-
+      predict.glm(fglm, as.data.frame(xMats), type = "response")
+    probVect <- 
+      predict.glm(fglm, as.data.frame(xMatt), type = "response")
   }
   else if (Method == "nb")
   {
@@ -41,7 +43,8 @@ Generate_Y_Given_X <- function(xMat, sData, Method = "logit")
             as.factor(sData[, "Y"]),
             'nb',
             trControl = trainControl(method = 'cv', number = 10))
-    probVec <- predict(nbFit, xMat, type = "prob")[, 2]
+    probVecs <- predict(nbFit, xMats, type = "prob")[, 2]
+    probVect <- predict(nbFit, xMatt, type = "prob")[, 2]
   }
   else if (Method == "rf")
   {
@@ -53,9 +56,13 @@ Generate_Y_Given_X <- function(xMat, sData, Method = "logit")
                    data = sData,
                    method = 'rf',
                    metric=metric, tuneLength=15, trControl=control)
-    probVec <- predict(rfFit, xMat, type = "prob")[, 2]
+    probVecs <- predict(rfFit, xMats, type = "prob")[, 2]
+    probVect <- predict(rfFit, xMatt, type = "prob")[, 2]
   }
-  return(probVec)
+  return(list(
+    prob_s = probVecs,
+    prob_t = probVect
+  ))
 }
 
 E_S_RHO_Given_X_Binary <- function(betaVal, yFittedGivenX, pwr)
