@@ -60,7 +60,9 @@ mean(sapply(results, function(x) {
 
 ###############
 
-B2 <- 12
+B2 <- 100
+
+t0 <- Sys.time()
 
 data_list_mc <- mclapply(1:B2, function(x)
 {
@@ -168,3 +170,5 @@ lapply(data_list_mc, function(YXR)
 }) -> lb_fit_list
 
 stopCluster(cl)
+
+Sys.time() - t0
