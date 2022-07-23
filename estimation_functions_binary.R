@@ -25,72 +25,15 @@ E_S_RHO_Binary <- function(betaVal, sData)
 Generate_Y_Given_X <-
   function(xMats, xMatt, sData, Method = "logit")
   {
-    if (Method == "logit" | Method == "probit")
-    {
-      fglm <-
-        glm(Y ~ .,
-            family = binomial(link = Method),
-            data = as.data.frame(sData))
-      probVecs <-
-        predict.glm(fglm, as.data.frame(xMats), type = "response")
-      probVect <-
-        predict.glm(fglm, as.data.frame(xMatt), type = "response")
-    }
-    else if (Method == "nb")
-    {
-      nbFit <-
-        train(sData[, -1],
-              as.factor(sData[, "Y"]),
-              'nb',
-              trControl = trainControl(method = 'cv', number = 10))
-      probVecs <- predict(nbFit, xMats, type = "prob")[, 2]
-      probVect <- predict(nbFit, xMatt, type = "prob")[, 2]
-    }
-    else if (Method == "rf")
-    {
-      control <-
-        trainControl(
-          method = "repeatedcv",
-          number = 10,
-          repeats = 3,
-          search = "random"
-        )
-      metric <- "Accuracy"
-      sData <- as.data.frame(sData)
-      sData[, "Y"] <- as.factor(sData[, "Y"])
-      rfFit <- train(
-        Y ~ .,
-        data = sData,
-        method = 'rf',
-        metric = metric,
-        tuneLength = 15,
-        trControl = control
-      )
-      probVecs <- predict(rfFit, xMats, type = "prob")[, 2]
-      probVect <- predict(rfFit, xMatt, type = "prob")[, 2]
-    }
-    else if (Method == "blr") # Boosted Logistic Regression
-    {
-      control <-
-        trainControl(
-          method = "repeatedcv",
-          number = 10,
-          repeats = 3,
-          search = "random"
-        )
-      metric <- "Accuracy"
-      sData <- as.data.frame(sData)
-      sData[, "Y"] <- as.factor(sData[, "Y"])
-      blrFit <- train(
-        Y ~ .,
-        data = sData,
-        method = "LogitBoost",
-        nIter = 5,
-        trControl = control
-      )
-      probVecs <- predict(blrFit, xMats, type = "prob")[,2]
-      probVect <- predict(blrFit, xMatt, type = "prob")[,2]
-    }
+    fglm <-
+      glm(Y ~ .,
+          family = binomial(link = Method),
+          data = as.data.frame(sData))
+    probVecs <-
+      predict.glm(fglm, as.data.frame(xMats), type = "response")
+    probVect <-
+      predict.glm(fglm, as.data.frame(xMatt), type = "response")
+    
     return(list(prob_s = probVecs,
                 prob_t = probVect))
   }
