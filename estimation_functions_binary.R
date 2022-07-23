@@ -22,7 +22,6 @@ E_S_RHO_Binary <- function(betaVal, sData)
   return(out)
 }
 
-
 Generate_Y_Given_X <-
   function(xMats, xMatt, sData, Method = "logit")
   {
@@ -208,6 +207,7 @@ Compute_S_Eff_Binary <-
            yFittedGivenX,
            yFittedGivenX_tDat)
   {
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
     # Labeled Data
     yVec <- sData[, "Y"]
     rhoVec <- exp(betaVal * yVec)
@@ -239,11 +239,11 @@ Compute_S_Eff_Binary <-
 Compute_S_Eff_Sum <-
   function(betaVal,
            sData,
-           c_ps,
            piVal,
            yFittedGivenX,
            yFittedGivenX_tDat)
   {
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
     S_Eff <-
       Compute_S_Eff_Binary(betaVal,
                            sData,
