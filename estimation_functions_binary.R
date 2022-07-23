@@ -70,6 +70,28 @@ Generate_Y_Given_X <-
       probVecs <- predict(rfFit, xMats, type = "prob")[, 2]
       probVect <- predict(rfFit, xMatt, type = "prob")[, 2]
     }
+    else if (Method == "blr") # Boosted Logistic Regression
+    {
+      control <-
+        trainControl(
+          method = "repeatedcv",
+          number = 10,
+          repeats = 3,
+          search = "random"
+        )
+      metric <- "Accuracy"
+      sData <- as.data.frame(sData)
+      sData[, "Y"] <- as.factor(sData[, "Y"])
+      blrFit <- train(
+        Y ~ .,
+        data = sData,
+        method = "LogitBoost",
+        nIter = 5,
+        trControl = control
+      )
+      probVecs <- predict(blrFit, xMats, type = "prob")[,2]
+      probVect <- predict(blrFit, xMatt, type = "prob")[,2]
+    }
     return(list(prob_s = probVecs,
                 prob_t = probVect))
   }
@@ -247,6 +269,6 @@ Compute_SE_Binary <-
                            piVal,
                            yFittedGivenX,
                            yFittedGivenX_tDat)
-    outVar <- 1 / mean(SEffVec ^ 2)
+    outVar <- 1 / mean(SEffVec ^ 2) / length(SEffVec)
     sqrt(outVar)
   }
