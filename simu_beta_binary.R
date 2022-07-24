@@ -15,6 +15,7 @@ B1 <- 1000
 
 t0 <- Sys.time()
 
+dir.create(file.path("binary_dat/"))
 ###############
 # Preparation
 ###############
@@ -27,7 +28,7 @@ mclapply(1:B1, function(x)
 },
 mc.cores = detectCores()) -> data_list_mc
 
-saveRDS(data_list_mc, file = paste("MC_Data_List_n_", n, ".RDS", sep = ""))
+saveRDS(data_list_mc, file = paste("binary_dat/MC_Data_List_n_", n, ".RDS", sep = ""))
 
 # Fitted Model
 
@@ -161,7 +162,7 @@ saveRDS(
     nb = nb_fit_list,
     lb = lb_fit_list
   ),
-  file = paste("Fitted_Models_n_", n, ".RDS", sep = "")
+  file = paste("binary_dat/Fitted_Models_n_", n, ".RDS", sep = "")
 )
 
 ##########################
@@ -359,7 +360,7 @@ estimation_inference <- mclapply(1:B1, function(i)
 mc.cores = detectCores())
 
 saveRDS(estimation_inference,
-        file = "Estimation_And_Inference_n_",
+        file = "binary_dat/Estimation_And_Inference_n_",
         n,
         ".RDS",
         sep = "")
@@ -379,5 +380,5 @@ df <- data.frame(
   Method = MethodVec,
   nVec = nVec
 )
-saveRDS(df, file = paste("df_n_", n, ".RDS", sep = ""))
+saveRDS(df, file = paste("binary_dat/df_n_", n, ".RDS", sep = ""))
 Sys.time() - t0
