@@ -3,15 +3,14 @@ library(doParallel)
 source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
-n <- commandArgs(TRUE)
-n <- as.numeric(n[1])
+n <- 1000
 
 Mu_X <- c(1,-1, 2)
 Sigma_X <- diag(3)
 alphaVec <- c(-1, 1,-2,-1)
 trueBeta <- -2
 gammaVec <- c(-1,-trueBeta)
-B1 <- 1000
+B1 <- 100
 
 t0 <- Sys.time()
 
@@ -360,10 +359,7 @@ estimation_inference <- mclapply(1:B1, function(i)
 mc.cores = detectCores())
 
 saveRDS(estimation_inference,
-        file = "binary_dat/Estimation_And_Inference_n_",
-        n,
-        ".RDS",
-        sep = "")
+        file = paste("binary_dat/Estimation_And_Inference_n_", n, ".RDS", sep = ""))
 
 ValVec <-
   rowMeans(sapply(estimation_inference, function(m) {
