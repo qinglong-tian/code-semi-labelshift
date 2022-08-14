@@ -14,6 +14,7 @@ read_in_data <- function(filename, dir)
 
 remove_outliers_2 <- function(vec)
 {
+  vec[!is.na(vec) & !is.finite(vec)] -> vec
   one_iqr <- IQR(vec, na.rm = T)
   lwrq <- quantile(vec, 0.25, na.rm = T) - 2 * one_iqr
   uprq <- quantile(vec, 0.75, na.rm = T) + 2 * one_iqr
