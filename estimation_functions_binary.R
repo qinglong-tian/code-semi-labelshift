@@ -215,3 +215,24 @@ Compute_SE_Binary <-
     outVar <- 1 / mean(SEffVec ^ 2) / length(SEffVec)
     sqrt(outVar)
   }
+
+find_weight_lipton <- function(sData, tData, fittedModel)
+{
+  if (class(fittedModel) == "train")
+  {
+    ptx <- predict(fittedModel, tData, type = "raw")
+    predicted <- ptx
+    ptx <- table(ptx)
+    
+    ptx0 <- ptx[1] / (sum(ptx))
+    ptx1 <- 1 - ptx0
+  }
+  else
+  {
+    ptx <- predict(fittedModel, as.data.frame(tData), type = "response")
+    predicted <- (ptx > 0.5)
+    ptx1 <- mean(ptx)
+    ptx0 <- 1 - ptx1
+  }
+  
+}

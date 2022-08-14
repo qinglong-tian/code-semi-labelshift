@@ -1,20 +1,29 @@
 library(parallel)
 library(doParallel)
+library(ranger)
 source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
-n <- 1000
+n <- 2000
+B1 <- 5
 
-Mu_X <- c(1,-1, 2)
-Sigma_X <- diag(3)
-alphaVec <- c(-1, 1,-2,-1)
+num_of_x <- 2
+Mu_X <- rep(0, num_of_x)
+Sigma_X <- matrix(nrow = num_of_x, ncol = num_of_x)
+rho <- 0.8
+for (i in 1:num_of_x)
+{
+  for (j in 1:num_of_x)
+  {
+    Sigma_X[i, j] <- rho ^ (abs(i - j))
+  }
+}
+alphaVec <- c(0, rep(1, length(Mu_X)))
 trueBeta <- -2
-gammaVec <- c(-1,-trueBeta)
-B1 <- 100
-
-t0 <- Sys.time()
+gammaVec <- c(0, -trueBeta)
 
 dir.create(file.path("binary_dat/"))
+
 ###############
 # Preparation
 ###############
@@ -27,142 +36,121 @@ mclapply(1:B1, function(x)
 },
 mc.cores = detectCores()) -> data_list_mc
 
-saveRDS(data_list_mc, file = paste("binary_dat/MC_Data_List_n_", n, ".RDS", sep = ""))
+saveRDS(data_list_mc,
+        file = paste("binary_dat/MC_Data_List_n_", n, ".RDS", sep = ""))
 
-# Fitted Model
+# Model Selection
 
-mclapply(data_list_mc, function(YXR)
-{
-  tData <- YXR$tData
-  sData <- YXR$sData
-  
-  fittedVal <- Generate_Y_Given_X(sData[,-1], tData, sData)
-  probVecs <- fittedVal$prob_s
-  probVect <- fittedVal$prob_t
-  
-  return(list(probs = probVecs,
-              probt = probVect))
-},
-mc.cores = detectCores()) -> logit_fit_list
-
-mclapply(data_list_mc, function(YXR)
-{
-  tData <- YXR$tData
-  sData <- YXR$sData
-  
-  fittedVal <-
-    Generate_Y_Given_X(sData[,-1], tData, sData, "probit")
-  probVecs <- fittedVal$prob_s
-  probVect <- fittedVal$prob_t
-  
-  return(list(probs = probVecs,
-              probt = probVect))
-},
-mc.cores = detectCores()) -> probit_fit_list
-
-cl <- makePSOCKcluster(detectCores() - 4)
-registerDoParallel(cl)
-
-lapply(data_list_mc, function(YXR)
-{
-  control <- trainControl(
-    method = "repeatedcv",
-    number = 10,
-    repeats = 3,
-    search = "random"
-  )
-  
-  metric <- "Accuracy"
-  sData <- YXR$sData
-  sData <- as.data.frame(sData)
-  sData[, "Y"] <- as.factor(sData[, "Y"])
-  tData <- YXR$tData
-  
-  rfFit <- train(
-    Y ~ .,
-    data = sData,
-    method = "rf",
-    metric = metric,
-    trControl = control
-  )
-  
-  probVecs <- predict(rfFit, sData[,-1], type = "prob")[, 2]
-  probVect <- predict(rfFit, tData, type = "prob")[, 2]
-  
-  return(list(probs = probVecs,
-              probt = probVect))
-}) -> rf_fit_list
-
-lapply(data_list_mc, function(YXR)
-{
-  control <- trainControl(
-    method = "repeatedcv",
-    number = 10,
-    repeats = 3,
-    search = "random"
-  )
-  
-  metric <- "Accuracy"
-  sData <- YXR$sData
-  sData <- as.data.frame(sData)
-  sData[, "Y"] <- as.factor(sData[, "Y"])
-  tData <- YXR$tData
-  rfFit <- train(
-    Y ~ .,
-    data = sData,
-    method = "nb",
-    metric = metric,
-    trControl = control
-  )
-  
-  probVecs <- predict(rfFit, sData[,-1], type = "prob")[, 2]
-  probVect <- predict(rfFit, tData, type = "prob")[, 2]
-  
-  return(list(probs = probVecs,
-              probt = probVect))
-}) -> nb_fit_list
-
-lapply(data_list_mc, function(YXR)
-{
-  control <- trainControl(
-    method = "repeatedcv",
-    number = 10,
-    repeats = 3,
-    search = "random"
-  )
-  
-  metric <- "Accuracy"
-  sData <- YXR$sData
-  sData <- as.data.frame(sData)
-  sData[, "Y"] <- as.factor(sData[, "Y"])
-  tData <- YXR$tData
-  rfFit <- train(
-    Y ~ .,
-    data = sData,
-    method = "LogitBoost",
-    metric = metric,
-    trControl = control
-  )
-  
-  probVecs <- predict(rfFit, sData[,-1], type = "prob")[, 2]
-  probVect <- predict(rfFit, tData, type = "prob")[, 2]
-  
-  return(list(probs = probVecs,
-              probt = probVect))
-}) -> lb_fit_list
-
-stopCluster(cl)
-
-saveRDS(
-  list(
-    logit = logit_fit_list,
-    probit = probit_fit_list,
-    rf = rf_fit_list,
-    nb = nb_fit_list,
-    lb = lb_fit_list
-  ),
-  file = paste("binary_dat/Fitted_Models_n_", n, ".RDS", sep = "")
+control <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  search = "random"
 )
+metric <- "Accuracy"
+
+# Estimating Probability
+
+lapply(data_list_mc, function(dat)
+{
+  tData <- as.data.frame(dat$tData)
+  sData <- as.data.frame(dat$sData)
+  sData[, "Y"] <-
+    factor(sData[, "Y"],
+           levels = c(0, 1),
+           labels = c("no", "yes"))
+  
+  # Logistic
+  fittedVal <- Generate_Y_Given_X(sData[,-1], tData, sData)
+  logitProbs <- fittedVal$prob_s
+  logitProbt <- fittedVal$prob_t
+  
+  # MLP
+  
+  mlpTrain <- train(
+    Y ~ .,
+    data = sData,
+    method = "mlp",
+    metric = metric,
+    trControl = control
+  )
+  
+  train(
+    Y ~ .,
+    data = sData,
+    method = "mlp",
+    tuneGrid = mlpTrain$finalModel$tuneValue,
+    trControl = trainControl(method = "none"),
+  ) -> mlpFit
+  
+  mlpProbs <-
+    predict(mlpFit, newdata = sData[, -1], type = "prob")[, 2]
+  mlpProbt <- predict(mlpFit, newdata = tData, type = "prob")[, 2]
+  
+  # Naive Bayes
+  
+  nbFit <- train(
+    Y ~ .,
+    data = sData,
+    method = 'nb',
+    metric = metric,
+    trControl = control
+  )
+  
+  nbProbs <- predict(nbFit, sData[,-1], type = "prob")[, 2]
+  nbProbt <- predict(nbFit, tData, type = "prob")[, 2]
+  
+  # SVM
+  
+  svmFit <- train(
+    Y ~ .,
+    data = sData,
+    method = 'svmLinear2',
+    metric = metric,
+    trControl = control,
+    probability = TRUE
+  )
+  svmProbs <- predict(svmFit, sData[,-1], type = "prob")[, 2]
+  svmProbt <- predict(svmFit, tData, type = "prob")[, 2]
+  
+  # XGBoost
+  
+  train(
+    Y ~ .,
+    data = sData,
+    method = "xgbTree",
+    metric = metric,
+    trControl = control
+  ) -> xgbFit
+  
+  xgboostFit <- train(
+    Y ~ .,
+    data = sData,
+    method = "xgbTree",
+    tuneGrid = data.frame(xgbFit$finalModel$tuneValue),
+    trControl = trainControl(method = "none")
+  )
+  
+  xgbProbs <-
+    predict(xgboostFit, as.matrix(sData[,-1]), type = "prob")[, 2]
+  xgbProbt <-
+    predict(xgboostFit, as.matrix(tData), type = "prob")[, 2]
+  
+  return(
+    list(
+      logit_s = logitProbs,
+      logit_t = logitProbt,
+      mlp_s = mlpProbs,
+      mlp_t = mlpProbt,
+      nb_s = nbProbs,
+      nb_t = nbProbt,
+      svm_s = svmProbs,
+      svm_t = svmProbt,
+      xgb_s = xgbProbs,
+      xgb_t = xgbProbt
+    )
+  )
+}) -> probList
 
 ##########################
 # Estimation & Inference
@@ -173,21 +161,30 @@ estimation_inference <- mclapply(1:B1, function(i)
   YXR <- data_list_mc[[i]]
   tData <- YXR$tData
   sData <- YXR$sData
+  sData <- as.data.frame(sData)
   piVal <- nrow(sData) / n
   
-  # Logit
-  fittedVal <- logit_fit_list[[i]]
-  probVecs <- fittedVal$probs
-  probVect <- fittedVal$probt
+  probTemp <- probList[[i]]
+  logit_s <- probTemp$logit_s
+  logit_t <- probTemp$logit_t
+  mlp_s <- probTemp$mlp_s
+  mlp_t <- probTemp$mlp_t
+  nb_s <- probTemp$nb_s
+  nb_t <- probTemp$nb_t
+  svm_s <- probTemp$svm_s
+  svm_t <- probTemp$svm_t
+  xgb_s <- probTemp$xgb_s
+  xgb_t <- probTemp$xgb_t
   
+  # Logit
   optim(
     par = trueBeta,
     fn = Compute_S_Eff_Sum,
     method = "BFGS",
     sData = sData,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = logit_s,
+    yFittedGivenX_tDat = logit_t
   ) -> optimOut
   c_ps <- E_S_RHO_Binary(optimOut$par, sData)
   
@@ -196,8 +193,8 @@ estimation_inference <- mclapply(1:B1, function(i)
     sData = sData,
     c_ps = c_ps,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = logit_s,
+    yFittedGivenX_tDat = logit_t
   ) -> se
   lwb <- optimOut$par - 1.96 * se
   upb <- optimOut$par + 1.96 * se
@@ -207,19 +204,15 @@ estimation_inference <- mclapply(1:B1, function(i)
   se_logit <- se
   cp_logit <- cp
   
-  # Probit
-  fittedVal <- probit_fit_list[[i]]
-  probVecs <- fittedVal$probs
-  probVect <- fittedVal$probt
-  
+  # MLP
   optim(
-    par = trueBeta,
+    par = -1.5,
     fn = Compute_S_Eff_Sum,
     method = "BFGS",
     sData = sData,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = mlp_s,
+    yFittedGivenX_tDat = mlp_t
   ) -> optimOut
   c_ps <- E_S_RHO_Binary(optimOut$par, sData)
   
@@ -228,62 +221,26 @@ estimation_inference <- mclapply(1:B1, function(i)
     sData = sData,
     c_ps = c_ps,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = mlp_s,
+    yFittedGivenX_tDat = mlp_t
   ) -> se
   lwb <- optimOut$par - 1.96 * se
   upb <- optimOut$par + 1.96 * se
   cp <- trueBeta < upb & trueBeta > lwb
   
-  beta_probit <- optimOut$par
-  se_probit <- se
-  cp_probit <- cp
-  
-  # Random Forest
-  fittedVal <- rf_fit_list[[i]]
-  probVecs <- fittedVal$probs
-  probVect <- fittedVal$probt
-  
-  optim(
-    par = trueBeta,
-    fn = Compute_S_Eff_Sum,
-    method = "BFGS",
-    sData = sData,
-    piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
-  ) -> optimOut
-  c_ps <- E_S_RHO_Binary(optimOut$par, sData)
-  
-  Compute_SE_Binary(
-    betaVal = optimOut$par,
-    sData = sData,
-    c_ps = c_ps,
-    piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
-  ) -> se
-  lwb <- optimOut$par - 1.96 * se
-  upb <- optimOut$par + 1.96 * se
-  cp <- trueBeta < upb & trueBeta > lwb
-  
-  beta_rf <- optimOut$par
-  se_rf <- se
-  cp_rf <- cp
+  beta_mlp <- optimOut$par
+  se_mlp <- se
+  cp_mlp <- cp
   
   # Naive Bayes
-  fittedVal <- nb_fit_list[[i]]
-  probVecs <- fittedVal$probs
-  probVect <- fittedVal$probt
-  
   optim(
-    par = trueBeta,
+    par = -1.5,
     fn = Compute_S_Eff_Sum,
     method = "BFGS",
     sData = sData,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = nb_s,
+    yFittedGivenX_tDat = nb_t
   ) -> optimOut
   c_ps <- E_S_RHO_Binary(optimOut$par, sData)
   
@@ -292,8 +249,8 @@ estimation_inference <- mclapply(1:B1, function(i)
     sData = sData,
     c_ps = c_ps,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = nb_s,
+    yFittedGivenX_tDat = nb_t
   ) -> se
   lwb <- optimOut$par - 1.96 * se
   upb <- optimOut$par + 1.96 * se
@@ -303,19 +260,15 @@ estimation_inference <- mclapply(1:B1, function(i)
   se_nb <- se
   cp_nb <- cp
   
-  # Boosted Logistic Regression
-  fittedVal <- lb_fit_list[[i]]
-  probVecs <- fittedVal$probs
-  probVect <- fittedVal$probt
-  
+  # SVM
   optim(
-    par = trueBeta,
+    par = -1.5,
     fn = Compute_S_Eff_Sum,
     method = "BFGS",
     sData = sData,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = svm_s,
+    yFittedGivenX_tDat = svm_t
   ) -> optimOut
   c_ps <- E_S_RHO_Binary(optimOut$par, sData)
   
@@ -324,8 +277,36 @@ estimation_inference <- mclapply(1:B1, function(i)
     sData = sData,
     c_ps = c_ps,
     piVal = piVal,
-    yFittedGivenX = probVecs,
-    yFittedGivenX_tDat = probVect
+    yFittedGivenX = svm_s,
+    yFittedGivenX_tDat = svm_t
+  ) -> se
+  lwb <- optimOut$par - 1.96 * se
+  upb <- optimOut$par + 1.96 * se
+  cp <- trueBeta < upb & trueBeta > lwb
+  
+  beta_svm <- optimOut$par
+  se_svm <- se
+  cp_svm <- cp
+  
+  # xgBoost
+  optim(
+    par = -1.5,
+    fn = Compute_S_Eff_Sum,
+    method = "BFGS",
+    sData = sData,
+    piVal = piVal,
+    yFittedGivenX = xgb_s,
+    yFittedGivenX_tDat = xgb_t
+  ) -> optimOut
+  c_ps <- E_S_RHO_Binary(optimOut$par, sData)
+  
+  Compute_SE_Binary(
+    betaVal = optimOut$par,
+    sData = sData,
+    c_ps = c_ps,
+    piVal = piVal,
+    yFittedGivenX = xgb_s,
+    yFittedGivenX_tDat = xgb_t
   ) -> se
   lwb <- optimOut$par - 1.96 * se
   upb <- optimOut$par + 1.96 * se
@@ -335,20 +316,19 @@ estimation_inference <- mclapply(1:B1, function(i)
   se_bl <- se
   cp_bl <- cp
   
-  #
   ValVec <- c(
     beta_logit,
     se_logit,
     cp_logit,
-    beta_probit,
-    se_probit,
-    cp_probit,
-    beta_rf,
-    se_rf,
-    cp_rf,
+    beta_mlp,
+    se_mlp,
+    cp_mlp,
     beta_nb,
     se_nb,
     cp_nb,
+    beta_svm,
+    se_svm,
+    cp_svm
     beta_bl,
     se_bl,
     cp_bl
@@ -358,23 +338,9 @@ estimation_inference <- mclapply(1:B1, function(i)
 },
 mc.cores = detectCores())
 
-saveRDS(estimation_inference,
-        file = paste("binary_dat/Estimation_And_Inference_n_", n, ".RDS", sep = ""))
-
-ValVec <-
-  rowMeans(sapply(estimation_inference, function(m) {
-    m[!is.finite(m)] <- NA
-    return(m)
-  }), na.rm = T)
-TypeVec <- rep(c("beta", "se", "cp"), 5)
-MethodVec <- rep(c("logit", "probit", "rf", "nb", "bl"), each = 3)
-nVec <- rep(n, 15)
-
-df <- data.frame(
-  Value = ValVec,
-  Type = TypeVec,
-  Method = MethodVec,
-  nVec = nVec
+saveRDS(
+  estimation_inference,
+  file = paste("binary_dat/Estimation_And_Inference_n_", n, ".RDS", sep = "")
 )
-saveRDS(df, file = paste("binary_dat/df_n_", n, ".RDS", sep = ""))
+
 Sys.time() - t0

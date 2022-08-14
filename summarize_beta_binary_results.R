@@ -16,7 +16,7 @@ dat_dir <- "binary_dat/"
 files <- list.files(dat_dir)
 
 TypeVec <- rep(c("beta", "se", "cp"), 5)
-MethodVec <- rep(c("logit", "probit", "rf", "nb", "bl"), each = 3)
+MethodVec <- rep(c("logit", "mlp", "nb", "svm", "xgb"), each = 3)
 
 df_final <- NULL
 for (file in files)
@@ -24,9 +24,9 @@ for (file in files)
   tmp <- readRDS(paste(dat_dir, file, sep = ""))
   n <- str_match(file, "Inference_n_(.*?).RDS")[2] %>% as.numeric()
   tmpMat <- t(sapply(tmp, function(x) {x}))
-  nVec <- rep(n, 20)
+  nVec <- n
   
-  betaMat <- tmpMat[, c(1,4,7,10,13)]
+  betaMat <- tmpMat[, c(1, 4, 7, 10, 13)]
   betaVec <- apply(betaMat, MARGIN = 2, function(x)
   {
     xx <- remove_outliers_binary(x)
@@ -37,7 +37,11 @@ for (file in files)
   cpVec <- colMeans(cpMat)
   
   seMat <- tmpMat[, c(2, 5, 8, 11, 14)]
-  seVec <- colMeans(seMat)
+  seVec <- apply(seMat, MARGIN = 2, function(x)
+  {
+    xx <- remove_outliers_binary(x)
+    mean(xx)
+  })
   
   apply(betaMat, 2, function(x)
   {
@@ -50,7 +54,7 @@ for (file in files)
   df <- data.frame(
     Value = ValVec,
     Type = c(TypeVec, rep("mse", 5)),
-    Method = c(MethodVec, c("logit", "probit", "rf", "nb", "bl")),
+    Method = c(MethodVec, c("logit", "mlp", "nb", "svm", "xgb")),
     nVec = nVec
   )
   
