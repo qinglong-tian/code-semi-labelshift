@@ -1,11 +1,12 @@
 library(parallel)
-library(doParallel)
 library(ranger)
 source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
 n <- 2000
-B1 <- 200
+B1 <- 100
+
+Sys.time() -> t0
 
 num_of_x <- 2
 Mu_X <- rep(0, num_of_x)
@@ -47,6 +48,9 @@ metric <- "Accuracy"
 
 # Estimating Probability
 
+cl <- makePSOCKcluster(detectCores())
+registerDoParallel(cl)
+
 lapply(data_list_mc, function(dat)
 {
   tData <- as.data.frame(dat$tData)
@@ -62,8 +66,9 @@ lapply(data_list_mc, function(dat)
   logitProbt <- fittedVal$prob_t
   
   # Random Forest
-  rfControl <- trainControl(method = "cv",
+  rfControl <- trainControl(method = "repeatedcv",
                             number = 10,
+                            repeats = 3,
                             search = "grid")
   rftunegrid <-
     expand.grid(
@@ -97,7 +102,7 @@ lapply(data_list_mc, function(dat)
   mlpTrain <- train(
     Y ~ .,
     data = sData,
-    method = "nnet",
+    method = "mlp",
     metric = metric,
     trControl = control
   )
@@ -105,7 +110,7 @@ lapply(data_list_mc, function(dat)
   train(
     Y ~ .,
     data = sData,
-    method = "nnet",
+    method = "mlp",
     tuneGrid = mlpTrain$finalModel$tuneValue,
     trControl = trainControl(method = "none"),
   ) -> mlpFit
@@ -143,12 +148,12 @@ lapply(data_list_mc, function(dat)
   # GBM
   
   gbmControl <- trainControl(method = "cv",
-                             number = 10,
+                             number = 5,
                              search = "grid")
   gbmGrid <-
     expand.grid(
-      .n.minobsinnode = c(3, 5, 10, 15, 20),
-      .n.trees = c(800, 2000, 500, 1000, 1500),
+      .n.minobsinnode = c(5, 10, 15, 20),
+      .n.trees = c(500, 1000, 1500),
       .interaction.depth = 1,
       .shrinkage = 0.01
     )
@@ -192,6 +197,8 @@ lapply(data_list_mc, function(dat)
     )
   )
 }) -> probList
+
+stopCluster(cl)
 
 ##########################
 # Estimation & Inference
@@ -411,6 +418,8 @@ estimation_inference <- mclapply(1:B1, function(i)
   return(ValVec)
 },
 mc.cores = detectCores())
+
+Sys.time() -t0
 
 saveRDS(
   estimation_inference,
