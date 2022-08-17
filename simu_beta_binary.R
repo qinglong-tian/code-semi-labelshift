@@ -1,4 +1,4 @@
-library(parallel)
+library(doParallel)
 library(ranger)
 source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
