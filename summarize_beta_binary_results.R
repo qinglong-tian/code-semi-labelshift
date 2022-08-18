@@ -33,6 +33,18 @@ for (file in files)
     mean(xx)
   })
   
+  biasVec <- apply(betaMat, MARGIN = 2, function(x)
+  {
+    xx <- remove_outliers_binary(x)
+    mean(xx) - trueBeta
+  })
+  
+  sdVec <- apply(betaMat, MARGIN = 2, function(x)
+  {
+    xx <- remove_outliers_binary(x)
+    sd(xx)
+  })
+  
   cpMat <- tmpMat[, c(3, 6, 9, 12, 15, 18)]
   cpVec <- colMeans(cpMat)
   
@@ -49,16 +61,50 @@ for (file in files)
     mean((xx-trueBeta)^2)
   }) -> mseVec
   
-  ValVec <- c(c(t(cbind(betaVec, seVec, cpVec))), mseVec)
+  ValVec <- c(c(t(cbind(betaVec, seVec, cpVec))), mseVec, biasVec, sdVec)
 
   df <- data.frame(
     Value = ValVec,
-    Type = c(TypeVec, rep("mse", 6)),
-    Method = c(MethodVec, c("logit", "rf", "mlp", "nb", "svm", "gbm")),
+    Type = c(TypeVec, rep("mse", 6), rep("bias", 6), rep("sd", 6)),
+    Method = c(MethodVec, rep(c("logit", "rf", "mlp", "nb", "svm", "gbm"), 3)),
     nVec = nVec
   )
   
   df_final <- rbind(df_final, df)
 }
 
-sapply(lipton_method_inference, function(x) {unlist(x)}) %>% rowMeans()
+df_final$Method2 <- "Proposed"
+
+dat_dir1 <- "binary_dat1/"
+files1 <- list.files(dat_dir1)
+for (file in files1)
+{
+  dfTmp <- NULL
+  tmp <- readRDS(paste(dat_dir1, file, sep = ""))
+  n <- str_match(file, "Lipton_n_(.*?).RDS")[2] %>% as.numeric()
+  tmp <- t(sapply(tmp, function(x) {
+    unlist(x)
+  }))
+  
+  # Bias
+  biasVec <- colMeans(tmp) - trueBeta
+  # MSE
+  trueBetaMat <-
+    matrix(trueBeta, ncol = ncol(tmp), nrow = nrow(tmp))
+  mseMat <- tmp - trueBetaMat
+  mseVec <- colMeans(mseMat ^ 2)
+  
+  valueVec <- c(biasVec, mseVec)
+  typeVec <- c(rep("bias", 6), rep("mse", 6))
+  nVec <- rep(n, 12)
+  methodVec <- rep(c("logit", "rf", "mlp", "nb", "svm", "gbm"), 2)
+  method2Vec <- rep("Lipton", 12)
+  
+  dfTmp$Value <- valueVec
+  dfTmp$Type <- typeVec
+  dfTmp$Method <- methodVec
+  dfTmp$nVec <- nVec
+  dfTmp$Method2 <- method2Vec
+  
+  df_final <- rbind(df_final, dfTmp)
+}
