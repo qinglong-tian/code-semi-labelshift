@@ -4,7 +4,7 @@ source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
 n <- 2000
-B1 <- 50
+B1 <- 20
 
 Sys.time() -> t0
 
@@ -21,9 +21,10 @@ for (i in 1:num_of_x)
 }
 alphaVec <- c(0, rep(1, length(Mu_X)))
 trueBeta <- -2
-gammaVec <- c(0,-trueBeta)
+gammaVec <- c(0, -trueBeta)
 
 dir.create(file.path("binary_dat/"))
+dir.create(file.path("binary_dat1/"))
 
 ###############
 # Preparation
@@ -61,7 +62,7 @@ lapply(data_list_mc, function(dat)
            labels = c("no", "yes"))
   
   # Logistic
-  fittedVal <- Generate_Y_Given_X(sData[, -1], tData, sData)
+  fittedVal <- Generate_Y_Given_X(sData[,-1], tData, sData)
   logitProbs <- fittedVal$prob_s
   logitProbt <- fittedVal$prob_t
   
@@ -96,7 +97,7 @@ lapply(data_list_mc, function(dat)
     min.node.size = rfFit2$finalModel$min.node.size
   )
   rfProbs <-
-    predict(dat.ranger, data = sData[,-1], type = "response")$predictions[, 2]
+    predict(dat.ranger, data = sData[, -1], type = "response")$predictions[, 2]
   rfProbt <-
     predict(dat.ranger, data = tData, type = "response")$predictions[, 2]
   
@@ -118,7 +119,7 @@ lapply(data_list_mc, function(dat)
   ) -> mlpFit
   
   mlpProbs <-
-    predict(mlpFit, newdata = sData[,-1], type = "prob")[, 2]
+    predict(mlpFit, newdata = sData[, -1], type = "prob")[, 2]
   mlpProbt <- predict(mlpFit, newdata = tData, type = "prob")[, 2]
   
   # Naive Bayes
@@ -131,7 +132,7 @@ lapply(data_list_mc, function(dat)
     trControl = control
   )
   
-  nbProbs <- predict(nbFit, sData[,-1], type = "prob")[, 2]
+  nbProbs <- predict(nbFit, sData[, -1], type = "prob")[, 2]
   nbProbt <- predict(nbFit, tData, type = "prob")[, 2]
   
   # SVM
@@ -144,7 +145,7 @@ lapply(data_list_mc, function(dat)
     trControl = control,
     probability = TRUE
   )
-  svmProbs <- predict(svmFit, sData[,-1], type = "prob")[, 2]
+  svmProbs <- predict(svmFit, sData[, -1], type = "prob")[, 2]
   svmProbt <- predict(svmFit, tData, type = "prob")[, 2]
   
   # GBM
@@ -180,7 +181,7 @@ lapply(data_list_mc, function(dat)
   )
   
   gbmProbs <-
-    predict(gbmFit, as.matrix(sData[, -1]), type = "prob")[, 2]
+    predict(gbmFit, as.matrix(sData[,-1]), type = "prob")[, 2]
   gbmProbt <-
     predict(gbmFit, as.matrix(tData), type = "prob")[, 2]
   
@@ -207,6 +208,65 @@ stopCluster(cl)
 ##########################
 # Estimation & Inference
 ##########################
+
+lipton_method_inference <- mclapply(1:B1, function(i) {
+  dat <- data_list_mc[[i]]
+  sData <- dat$sData
+  
+  probTemp <- probList[[i]]
+  # Logit
+  logit_s <- probTemp$logit_s
+  logit_t <- probTemp$logit_t
+  
+  logitBeta <-
+    Estimate_Beta_Lipton(logit_s, logit_t, sData, trueBeta)
+  
+  # Random Forest
+  rf_s <- probTemp$rf_s
+  rf_t <- probTemp$rf_t
+  
+  rfBeta <- Estimate_Beta_Lipton(rf_s, rf_t, sData, trueBeta)
+  
+  # MLP
+  mlp_s <- probTemp$mlp_s
+  mlp_t <- probTemp$mlp_t
+  
+  mlpBeta <- Estimate_Beta_Lipton(mlp_s, mlp_t, sData, trueBeta)
+  
+  # Naive Bayes
+  nb_s <- probTemp$nb_s
+  nb_t <- probTemp$nb_t
+  
+  nbBeta <- Estimate_Beta_Lipton(nb_s, nb_t, sData, trueBeta)
+  
+  # SVM
+  svm_s <- probTemp$svm_s
+  svm_t <- probTemp$svm_t
+  
+  svmBeta <- Estimate_Beta_Lipton(svm_s, svm_t, sData, trueBeta)
+  
+  # Gradient Boost
+  xgb_s <- probTemp$xgb_s
+  xgb_t <- probTemp$xgb_t
+  xgbBeta <- Estimate_Beta_Lipton(xgb_s, xgb_t, sData, trueBeta)
+  
+  return(
+    list(
+      beta_logit = logitBeta,
+      beta_rf = rfBeta,
+      beta_mlp = mlpBeta,
+      beta_nb = nbBeta,
+      beta_svm = svmBeta,
+      beta_xgb = xgbBeta
+    )
+  )
+},
+mc.cores = detectCores())
+
+saveRDS(
+  lipton_method_inference,
+  file = paste("binary_dat/Lipton_n_", n, ".RDS", sep = "")
+)
 
 estimation_inference <- mclapply(1:B1, function(i)
 {
@@ -423,7 +483,7 @@ estimation_inference <- mclapply(1:B1, function(i)
 },
 mc.cores = detectCores())
 
-Sys.time() -t0
+Sys.time() - t0
 
 saveRDS(
   estimation_inference,
