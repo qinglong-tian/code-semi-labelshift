@@ -60,3 +60,5 @@ for (file in files)
   
   df_final <- rbind(df_final, df)
 }
+
+sapply(lipton_method_inference, function(x) {unlist(x)}) %>% rowMeans()
