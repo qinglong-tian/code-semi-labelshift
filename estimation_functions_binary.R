@@ -216,23 +216,24 @@ Compute_SE_Binary <-
     sqrt(outVar)
   }
 
-find_weight_lipton <- function(sData, tData, fittedModel)
+Compute_Lipton_Score <- function(betaVal, probVecS, probVecT, sData)
 {
-  if (class(fittedModel) == "train")
+  yVec <- sData[, "Y"]
+  n <- length(probVecS)
+  m <- length(probVecT)
+  piVal <- n / (n + m)
+  c_ps <- E_S_RHO_Binary(betaVal, sData)
+  
+  score <- 0
+  for (i in 1:n)
   {
-    ptx <- predict(fittedModel, tData, type = "raw")
-    predicted <- ptx
-    ptx <- table(ptx)
-    
-    ptx0 <- ptx[1] / (sum(ptx))
-    ptx1 <- 1 - ptx0
+    rhoVal <- exp(betaVal * yVec[i])
+    score <- score + 1 / piVal * rhoVal / c_ps * probVecS[i]
   }
-  else
+  for (i in 1:m)
   {
-    ptx <- predict(fittedModel, as.data.frame(tData), type = "response")
-    predicted <- (ptx > 0.5)
-    ptx1 <- mean(ptx)
-    ptx0 <- 1 - ptx1
+    score <- score - 1 / (1 - piVal) * probVecT[i]
   }
   
+  return((score / (n + m)) ^ 2)
 }
