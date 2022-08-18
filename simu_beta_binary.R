@@ -4,11 +4,11 @@ source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
 n <- 2000
-B1 <- 100
+B1 <- 50
 
 Sys.time() -> t0
 
-num_of_x <- 2
+num_of_x <- 3
 Mu_X <- rep(0, num_of_x)
 Sigma_X <- matrix(nrow = num_of_x, ncol = num_of_x)
 rho <- 0.8
@@ -21,7 +21,7 @@ for (i in 1:num_of_x)
 }
 alphaVec <- c(0, rep(1, length(Mu_X)))
 trueBeta <- -2
-gammaVec <- c(0, -trueBeta)
+gammaVec <- c(0,-trueBeta)
 
 dir.create(file.path("binary_dat/"))
 
@@ -30,6 +30,9 @@ dir.create(file.path("binary_dat/"))
 ###############
 
 # Data
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
 
 mclapply(1:B1, function(x)
 {
@@ -48,9 +51,6 @@ metric <- "Accuracy"
 
 # Estimating Probability
 
-cl <- makePSOCKcluster(detectCores())
-registerDoParallel(cl)
-
 lapply(data_list_mc, function(dat)
 {
   tData <- as.data.frame(dat$tData)
@@ -61,15 +61,17 @@ lapply(data_list_mc, function(dat)
            labels = c("no", "yes"))
   
   # Logistic
-  fittedVal <- Generate_Y_Given_X(sData[,-1], tData, sData)
+  fittedVal <- Generate_Y_Given_X(sData[, -1], tData, sData)
   logitProbs <- fittedVal$prob_s
   logitProbt <- fittedVal$prob_t
   
   # Random Forest
-  rfControl <- trainControl(method = "repeatedcv",
-                            number = 10,
-                            repeats = 3,
-                            search = "grid")
+  rfControl <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 3,
+    search = "grid"
+  )
   rftunegrid <-
     expand.grid(
       .mtry = c(1, 2),
@@ -94,7 +96,7 @@ lapply(data_list_mc, function(dat)
     min.node.size = rfFit2$finalModel$min.node.size
   )
   rfProbs <-
-    predict(dat.ranger, data = sData[, -1], type = "response")$predictions[, 2]
+    predict(dat.ranger, data = sData[,-1], type = "response")$predictions[, 2]
   rfProbt <-
     predict(dat.ranger, data = tData, type = "response")$predictions[, 2]
   
@@ -116,7 +118,7 @@ lapply(data_list_mc, function(dat)
   ) -> mlpFit
   
   mlpProbs <-
-    predict(mlpFit, newdata = sData[, -1], type = "prob")[, 2]
+    predict(mlpFit, newdata = sData[,-1], type = "prob")[, 2]
   mlpProbt <- predict(mlpFit, newdata = tData, type = "prob")[, 2]
   
   # Naive Bayes
@@ -129,7 +131,7 @@ lapply(data_list_mc, function(dat)
     trControl = control
   )
   
-  nbProbs <- predict(nbFit, sData[, -1], type = "prob")[, 2]
+  nbProbs <- predict(nbFit, sData[,-1], type = "prob")[, 2]
   nbProbt <- predict(nbFit, tData, type = "prob")[, 2]
   
   # SVM
@@ -142,7 +144,7 @@ lapply(data_list_mc, function(dat)
     trControl = control,
     probability = TRUE
   )
-  svmProbs <- predict(svmFit, sData[, -1], type = "prob")[, 2]
+  svmProbs <- predict(svmFit, sData[,-1], type = "prob")[, 2]
   svmProbt <- predict(svmFit, tData, type = "prob")[, 2]
   
   # GBM
@@ -164,7 +166,8 @@ lapply(data_list_mc, function(dat)
     method = "gbm",
     metric = "Accuracy",
     trControl = gbmControl,
-    tuneGrid = gbmGrid
+    tuneGrid = gbmGrid,
+    verbose = F
   ) -> gbmTrain
   
   gbmFit <- train(
@@ -172,11 +175,12 @@ lapply(data_list_mc, function(dat)
     data = sData,
     method = "gbm",
     tuneGrid = data.frame(gbmTrain$finalModel$tuneValue),
-    trControl = trainControl(method = "none")
+    trControl = trainControl(method = "none"),
+    verbose = F
   )
   
   gbmProbs <-
-    predict(gbmFit, as.matrix(sData[,-1]), type = "prob")[, 2]
+    predict(gbmFit, as.matrix(sData[, -1]), type = "prob")[, 2]
   gbmProbt <-
     predict(gbmFit, as.matrix(tData), type = "prob")[, 2]
   
