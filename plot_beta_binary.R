@@ -1,4 +1,7 @@
 source("summarize_beta_binary_results.R")
+library(ggpubr)
+library(knitr)
+library(kableExtra)
 
 df_final %>% mutate(
   Method2 = factor(
@@ -15,38 +18,14 @@ df_final %>% mutate(
 
 df_final %>% filter(Method != "NB") -> df_final
 
-df_final %>% filter(
-  Type == "bias"
-) %>% ggplot(
-  aes(x = nVec, y = Value, col = Method2)
-) + geom_line(
-  aes(linetype = Method2)
-) + facet_wrap(
-  vars(Method)
-) + geom_hline(
-  yintercept = 0, linetype = 2
-) + xlab(
-  "n"
-) + ylab(
-  "Bias"
-)
+df_final %>% filter(Type == "bias") %>% ggplot(aes(x = nVec, y = Value, col = Method2)) + geom_line(aes(linetype = Method2)) + facet_wrap(vars(Method)) + geom_hline(yintercept = 0, linetype = 2) + xlab("n") + ylab("Bias") +
+  labs(color = "Method", linetype = "Method") -> bias_lipton
 
-df_final %>% filter(
-  Type == "mse"
-) %>% ggplot(
-  aes(x = nVec, y = Value, col = Method2)
-) + geom_line(
-  aes(linetype = Method2)
-) + facet_wrap(
-  vars(Method)
-) + xlab(
-  "n"
-) + ylab(
-  "MSE"
-) + scale_y_continuous(
-  trans='log10'
-)
-library(knitr)
+df_final %>% filter(Type == "mse") %>% ggplot(aes(x = nVec, y = Value, col = Method2)) + geom_line(aes(linetype = Method2)) + facet_wrap(vars(Method)) + xlab("n") + ylab("MSE") + scale_y_continuous(trans =
+                                                                                                                                                                                                        'log10') + labs(color = "Method", linetype = "Method") -> mse_lipton
+
+ggarrange(bias_lipton, mse_lipton, nrow = 2, labels = c("(a)", "(b)"))
+
 collapse_rows_dt <- expand.grid(
   "n+m" = c('500', '1000', '1500', '2000', '2500', '3000'),
   "Model" = c("Logistic", "RF", "SVM", "MLP", "GBM")
@@ -81,7 +60,6 @@ df_final %>% filter(
 ) %>% select(Value) -> cpVec
 collapse_rows_dt$CP <- format(cpVec, digits = 3)
 
-library(kableExtra)
 
 kbl(
   collapse_rows_dt,
