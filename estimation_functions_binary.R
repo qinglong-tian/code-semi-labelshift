@@ -237,3 +237,17 @@ Compute_Lipton_Score <- function(betaVal, probVecS, probVecT, sData)
   
   return((score / (n + m)) ^ 2)
 }
+
+Estimate_Beta_Lipton <-
+  function(probVecS, probVecT, sData, initBeta)
+  {
+    opt <-
+      optim(
+        initBeta,
+        Compute_Lipton_Score,
+        probVecS = probVecS,
+        probVecT = probVecT,
+        sData = sData
+      )
+    return(opt$par)
+  }
