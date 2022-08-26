@@ -10,8 +10,8 @@ dat4plot %>% melt(
 ) %>% mutate(
   Method = factor(
     Method,
-    levels = c("rejNaive", "rejEff"),
-    labels = c("Naive", "Proposed")
+    levels = c("rejEff", "rejNaive"),
+    labels = c("Proposed", "Naive")
   ),
   Ratio = ifelse(
     ratio == 0.5,
