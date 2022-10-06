@@ -56,9 +56,8 @@ Compute_GLM_Pr_R1_Given_Y <- function(sData, tData, rSofaLogistic)
 
 Fit_Sofa_Score <- function(sDat)
 {
-  sDat %>% mutate(sofa = factor(sofa, levels = paste(0:10))) %>% mutate (sofa = relevel(sofa, ref = "10")) -> sDat1
-  multinom_model <- multinom(sofa ~ ., data = sDat1)
-  return(multinom_model)
+  lm(sofa ~ ., data = sDat) -> fit
+  return(fit)
 }
 
 E_S_RHO_App <- function(betaVal, sDat)
@@ -67,52 +66,72 @@ E_S_RHO_App <- function(betaVal, sDat)
   mean(exp(betaVal * sofaScore))
 }
 
-Pred_Sofa_Given_X_S <- function(sDat, tDat)
+E_S_RHO_Given_X_App <- function(betaVal, pyxs, pwr, ghDat, xMat)
 {
-  multi_nominal <- Fit_Sofa_Score(sDat)
-  prob_xs <- predict(multi_nominal, newdata = sDat, type = "probs")
-  prob_xt <- predict(multi_nominal, newdata = tDat, type = "probs")
+  coef_yx_s <- coef(pyxs)
+  sigma_yx_s <- sigma(pyxs)
   
-  return(list(prob_list_xs = prob_xs,
-              prob_list_xt = prob_xt))
+  xGH <- ghDat$x
+  wGH <- ghDat$w
+  
+  muVec <- cbind(1, xMat) %*% matrix(c(coef_yx_s), ncol = 1)
+  sofaMat <- matrix(muVec, nrow = nrow(xMat), ncol = length(xGH))
+  addedMat <-
+    matrix(
+      sqrt(2) * sigma_yx_s * xGH,
+      ncol = length(xGH),
+      nrow = nrow(xMat),
+      byrow = T
+    )
+  sofaMat <- sofaMat + addedMat
+  wMat <-
+    matrix(wGH,
+           nrow = nrow(xMat),
+           ncol = length(wGH),
+           byrow = T)
+  rowSums(exp(pwr * betaVal * sofaMat) * wMat) / sqrt(pi)
 }
 
-E_S_RHO_Given_X_App <- function(betaVal, prob_list_x, pwr)
+E_T_RHO_Given_X_App <- function(betaVal, pyxs, ghDat, xMat)
 {
-  matrix(
-    exp(pwr * betaVal * (0:10)),
-    ncol = length(0:10),
-    nrow = nrow(prob_list_x),
-    byrow = T
-  ) -> rhoMat
-  rowSums(rhoMat * prob_list_x)
-}
-
-E_T_RHO_Given_X_App <- function(betaVal, prob_list_x)
-{
-  es2 <- E_S_RHO_Given_X_App(betaVal, prob_list_x, 2)
-  es <- E_S_RHO_Given_X_App(betaVal, prob_list_x, 1)
+  es2 <- E_S_RHO_Given_X_App(betaVal, pyxs, 2, ghDat, xMat)
+  es <- E_S_RHO_Given_X_App(betaVal, pyxs, 1, ghDat, xMat)
   
   es2 / es
 }
 
-Compute_Tau_App <- function(betaVal, prob_list_x, c_ps, piVal)
+Compute_Tau_App <- function(betaVal, pyxs, ghDat, xMat, c_ps, piVal)
 {
-  e_t_rho_given_x <- E_T_RHO_Given_X_App(betaVal, prob_list_x)
+  e_t_rho_given_x <- E_T_RHO_Given_X_App(betaVal, pyxs, ghDat, xMat)
   tmp <- e_t_rho_given_x / piVal / c_ps
   
   tmp / (tmp + 1 / (1 - piVal))
 }
 
-E_S_RHO_Y_Given_X_App <- function(betaVal, prob_list_x)
+E_S_RHO_Y_Given_X_App <- function(betaVal, pyxs, ghDat, xMat)
 {
-  matrix((0:10) * exp((0:10) * betaVal),
-         ncol = length(0:10),
-         nrow = nrow(prob_list_x),
-         byrow = T
-  ) -> rhoMat
+  coef_yx_s <- coef(pyxs)
+  sigma_yx_s <- sigma(pyxs)
   
-  rowSums(rhoMat * prob_list_x)
+  xGH <- ghDat$x
+  wGH <- ghDat$w
+  
+  muVec <- cbind(1, xMat) %*% matrix(coef_yx_s, ncol = 1)
+  sofaMat <- matrix(muVec, nrow = nrow(xMat), ncol = length(xGH))
+  addedMat <-
+    matrix(
+      sqrt(2) * sigma_yx_s * xGH,
+      ncol = length(xGH),
+      nrow = nrow(xMat),
+      byrow = T
+    )
+  sofaMat <- sofaMat + addedMat
+  wMat <-
+    matrix(wGH,
+           nrow = nrow(xMat),
+           ncol = length(wGH),
+           byrow = T)
+  rowSums(sofaMat * exp(betaVal * sofaMat) * wMat) / sqrt(pi)
 }
 
 E_S_RHO_Y_App <- function(betaVal, sDat)
@@ -122,50 +141,63 @@ E_S_RHO_Y_App <- function(betaVal, sDat)
   mean(sofaScore * rhoScore)
 }
 
-Compute_S_App <- function(betaVal, prob_list_x, sDat, c_ps)
+Compute_S_App <- function(betaVal, pyxs, ghDat, xMat, c_ps, sDat)
 {
-  e_s_rho_y_given_x <- E_S_RHO_Y_Given_X_App(betaVal, prob_list_x)
-  e_s_rho_given_x <- E_S_RHO_Given_X_App(betaVal, prob_list_x, 1)
+  e_s_rho_y_given_x <-
+    E_S_RHO_Y_Given_X_App(betaVal, pyxs, ghDat, xMat)
+  e_s_rho_given_x <-
+    E_S_RHO_Given_X_App(betaVal, pyxs, 1, ghDat, xMat)
   e_s_rho_y <- E_S_RHO_Y_App(betaVal, sDat)
   
   e_s_rho_y_given_x / e_s_rho_given_x - e_s_rho_y / c_ps
 }
 
-E_T_Tau_S_App <- function(betaVal, prob_list_xt, sDat, c_ps, piVal)
-{
-  SVec <- Compute_S_App(betaVal, prob_list_xt, sDat, c_ps)
-  rhoVec <- Compute_Tau_App(betaVal, prob_list_xt, c_ps, piVal)
-  mean(SVec * rhoVec)
-}
+E_T_Tau_S_App <-
+  function(betaVal,
+           pyxs,
+           ghDat,
+           xMat_t,
+           c_ps,
+           sDat,
+           piVal)
+  {
+    SVec <- Compute_S_App(betaVal, pyxs, ghDat, xMat_t, c_ps, sDat)
+    rhoVec <- Compute_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
+    mean(SVec * rhoVec)
+  }
 
-E_T_Tau_App <- function(betaVal, prob_list_xt, c_ps, piVal)
+E_T_Tau_App <- function(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
 {
-  mean(Compute_Tau_App(betaVal, prob_list_xt, c_ps, piVal))
+  mean(Compute_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal))
 }
 
 Compute_B_App <-
   function(betaVal,
-           prob_list_x,
-           prob_list_xt,
-           sDat,
+           pyxs,
+           ghDat,
+           xMat,
+           xMat_t,
            c_ps,
-           piVal)
+           piVal,
+           sDat)
   {
-    tau_x <- Compute_Tau_App(betaVal, prob_list_x, c_ps, piVal)
-    s_x <- Compute_S_App(betaVal, prob_list_x, sDat, c_ps)
+    tau_x <- Compute_Tau_App(betaVal, pyxs, ghDat, xMat, c_ps, piVal)
+    s_x <- Compute_S_App(betaVal, pyxs, ghDat, xMat, c_ps, sDat)
     e_t_tau_s <-
-      E_T_Tau_S_App(betaVal, prob_list_xt, sDat, c_ps, piVal)
-    e_t_tau <- E_T_Tau_App(betaVal, prob_list_xt, c_ps, piVal)
+      E_T_Tau_S_App(betaVal, pyxs, ghDat, xMat_t, c_ps, sDat, piVal)
+    e_t_tau <- E_T_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
     (-1) * (1 - piVal) * (1 - tau_x) * (s_x - e_t_tau_s / (e_t_tau - 1))
   }
 
 Compute_S_Eff_App <-
   function(betaVal,
-           sDat,
+           pyxs,
+           ghDat,
+           xMat_s,
+           xMat_t,
            c_ps,
            piVal,
-           prob_list_xs,
-           prob_list_xt)
+           sDat)
   {
     c_ps <- E_S_RHO_App(betaVal, sDat)
     sofaScore <- sDat$sofa
@@ -173,11 +205,25 @@ Compute_S_Eff_App <-
     
     mult1 <- 1 / piVal * rhoVec / c_ps
     b1 <-
-      Compute_B_App(betaVal, prob_list_xs, prob_list_xt, sDat, c_ps, piVal)
+      Compute_B_App(betaVal,
+                    pyxs,
+                    ghDat,
+                    xMat_s,
+                    xMat_t,
+                    c_ps,
+                    piVal,
+                    sDat)
     
     mult2 <- -1 / (1 - piVal)
     b2 <-
-      Compute_B_App(betaVal, prob_list_xt, prob_list_xt, sDat, c_ps, piVal)
+      Compute_B_App(betaVal,
+                    pyxs,
+                    ghDat,
+                    xMat_t,
+                    xMat_t,
+                    c_ps,
+                    piVal,
+                    sDat)
     
     S_Eff <- c(mult1 * b1, mult2 * b2)
     
@@ -186,13 +232,25 @@ Compute_S_Eff_App <-
 
 Compute_S_Eff_Sum_App <-
   function(betaVal,
-           sDat,
+           pyxs,
+           ghDat,
+           xMat_s,
+           xMat_t,
            piVal,
-           prob_list_xs,
-           prob_list_xt)
+           sDat)
   {
+    xMat_s <- as.matrix(xMat_s)
+    xMat_t <- as.matrix(xMat_t)
+    
     c_ps <- E_S_RHO_App(betaVal, sDat)
     S_Eff <-
-      Compute_S_Eff_App(betaVal, sDat, c_ps, piVal, prob_list_xs, prob_list_xt)
+      Compute_S_Eff_App(betaVal,
+                        pyxs,
+                        ghDat,
+                        xMat_s,
+                        xMat_t,
+                        c_ps,
+                        piVal,
+                        sDat)
     mean(S_Eff) ^ 2
   }

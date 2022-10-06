@@ -1,6 +1,7 @@
 library(tidyverse)
 library(reshape2)
 library(nnet)
+library(fastGHQuad)
 
 source("application_func.R")
 dat_dir <- "real_dat"
@@ -33,12 +34,15 @@ data <-
                                                                       sofa <= 10) %>% group_by(subject_id) %>% slice(which.min(admittime)) %>% na.omit %>% mutate(R = if_else(insurance %in% c("Medicare", "Medicaid"), 0, 1))
 
 rSofaLogistic <-
-  glm(R ~ poly(sofa, 2),
+  glm(R ~ sofa,
       family = binomial(link = "logit"),
       data = data)
+data <- data %>% ungroup(subject_id)
 
-sDat <- data %>% filter(R == 1) %>% select(-R,-insurance)
-tDat <- data %>% filter(R == 0) %>% select(-R,-insurance)
+sDat <-
+  data %>% filter(R == 1) %>% select(-R, -insurance, -admittime,-subject_id, -age)
+tDat <-
+  data %>% filter(R == 0) %>% select(-R, -insurance, -admittime,-subject_id, -age)
 
 Compute_GLM_Pr_R1_Given_Y(sDat, tDat, rSofaLogistic) -> df
 df <- df %>% mutate(SOFA = as.numeric(SOFA))
@@ -55,19 +59,20 @@ df %>% ggplot(aes(x = SOFA, y = Prob, col = Type)) + geom_point() + geom_line()
 # predict(multinom_model, newdata = sDat[1:5, ], type = "probs") -> probMat
 # apply(probMat, 1, cumsum)
 
-Pred_Sofa_Given_X_S(sDat, tDat) -> probList
-probListXs <- probList$prob_list_xs
-probListXt <- probList$prob_list_xt
+Fit_Sofa_Score(sDat) -> pyxs
 piVal <- nrow(sDat) / (nrow(sDat) + nrow(tDat))
+ghDat <- gaussHermiteData(9)
 
 optim(
-  0,
+  -0.1,
   Compute_S_Eff_Sum_App,
+  pyxs = pyxs,
+  ghDat = ghDat,
+  xMat_s = sDat[, -ncol(sDat)],
+  xMat_t = tDat[, -ncol(tDat)],
   sDat = sDat,
   piVal = piVal,
-  prob_list_xs = probListXs,
-  prob_list_xt = probListXt,
   method = "Brent",
-  lower = -5,
-  upper = 5
+  lower = -10,
+  upper = 10
 )
