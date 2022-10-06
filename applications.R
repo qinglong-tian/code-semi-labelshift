@@ -75,4 +75,44 @@ optim(
   method = "Brent",
   lower = -10,
   upper = 10
-)
+) -> fit1
+
+optim(
+  -0.1,
+  Compute_S_Eff_Sum_Naive_App,
+  pyxs = pyxs,
+  ghDat = ghDat,
+  xMat_s = sDat[, -ncol(sDat)],
+  xMat_t = tDat[, -ncol(tDat)],
+  sDat = sDat,
+  piVal = piVal,
+  method = "Brent",
+  lower = -10,
+  upper = 10
+) -> fit2
+
+
+Compute_Beta_Var_App(
+  fit1$par,
+  pyxs,
+  ghDat,
+  as.matrix(sDat[,-ncol(sDat)]),
+  as.matrix(tDat[,-ncol(tDat)]),
+  E_S_RHO_App(fit1$par, sDat),
+  piVal,
+  sDat
+) -> var1
+fit1$par-1.96*sqrt(var1)
+
+Compute_Beta_Var_App(
+  fit2$par,
+  pyxs,
+  ghDat,
+  as.matrix(sDat[,-ncol(sDat)]),
+  as.matrix(tDat[,-ncol(tDat)]),
+  E_S_RHO_App(fit2$par, sDat),
+  piVal,
+  sDat
+) -> var2
+
+fit2$par-1.96*sqrt(var2)

@@ -162,7 +162,8 @@ E_T_Tau_S_App <-
            piVal)
   {
     SVec <- Compute_S_App(betaVal, pyxs, ghDat, xMat_t, c_ps, sDat)
-    rhoVec <- Compute_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
+    rhoVec <-
+      Compute_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
     mean(SVec * rhoVec)
   }
 
@@ -185,7 +186,8 @@ Compute_B_App <-
     s_x <- Compute_S_App(betaVal, pyxs, ghDat, xMat, c_ps, sDat)
     e_t_tau_s <-
       E_T_Tau_S_App(betaVal, pyxs, ghDat, xMat_t, c_ps, sDat, piVal)
-    e_t_tau <- E_T_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
+    e_t_tau <-
+      E_T_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
     (-1) * (1 - piVal) * (1 - tau_x) * (s_x - e_t_tau_s / (e_t_tau - 1))
   }
 
@@ -230,6 +232,30 @@ Compute_S_Eff_App <-
     return(as.numeric(S_Eff))
   }
 
+Compute_S_Eff_Naive_App <- function(betaVal,
+                                    pyxs,
+                                    ghDat,
+                                    xMat_s,
+                                    xMat_t,
+                                    c_ps,
+                                    piVal,
+                                    sDat)
+{
+  c_ps <- E_S_RHO_App(betaVal, sDat)
+  sofaScore <- sDat$sofa
+  rhoVec <- exp(betaVal * sofaScore)
+  
+  mult1 <- 1 / piVal * rhoVec / c_ps
+  mult2 <- -1 / (1 - piVal)
+  
+  b1 <- predict(pyxs, newdata = as.data.frame(xMat_s))
+  b2 <- predict(pyxs, newdata = as.data.frame(xMat_t))
+  
+  S_Eff <- c(mult1 * b1, mult2 * b2)
+  
+  return(as.numeric(S_Eff))
+}
+
 Compute_S_Eff_Sum_App <-
   function(betaVal,
            pyxs,
@@ -254,3 +280,63 @@ Compute_S_Eff_Sum_App <-
                         sDat)
     mean(S_Eff) ^ 2
   }
+
+Compute_S_Eff_Sum_Naive_App <-
+  function(betaVal,
+           pyxs,
+           ghDat,
+           xMat_s,
+           xMat_t,
+           piVal,
+           sDat)
+  {
+    xMat_s <- as.matrix(xMat_s)
+    xMat_t <- as.matrix(xMat_t)
+    c_ps <- E_S_RHO_App(betaVal, sDat)
+    S_Eff <-
+      Compute_S_Eff_Naive_App(betaVal,
+                              pyxs,
+                              ghDat,
+                              xMat_s,
+                              xMat_t,
+                              c_ps,
+                              piVal,
+                              sDat)
+    mean(S_Eff) ^ 2
+    
+  }
+
+Compute_Beta_Var_App <- function(betaVal,
+                                 pyxs,
+                                 ghDat,
+                                 xMat_s,
+                                 xMat_t,
+                                 c_ps,
+                                 piVal,
+                                 sDat,
+                                 proposed = T)
+{
+  if (!proposed)
+  {
+    seff <- Compute_S_Eff_Naive_App(betaVal,
+                                    pyxs,
+                                    ghDat,
+                                    xMat_s,
+                                    xMat_t,
+                                    c_ps,
+                                    piVal,
+                                    sDat)
+  }
+  else
+  {
+    seff <- Compute_S_Eff_App(betaVal,
+                              pyxs,
+                              ghDat,
+                              xMat_s,
+                              xMat_t,
+                              c_ps,
+                              piVal,
+                              sDat)
+  }
+  1 / mean(seff ^ 2) / length(seff)
+}
