@@ -108,31 +108,32 @@ Compute_Tau_App <- function(betaVal, pyxs, ghDat, xMat, c_ps, piVal)
   tmp / (tmp + 1 / (1 - piVal))
 }
 
-E_S_RHO_Y_Given_X_App <- function(betaVal, pyxs, ghDat, xMat)
-{
-  coef_yx_s <- coef(pyxs)
-  sigma_yx_s <- sigma(pyxs)
-  
-  xGH <- ghDat$x
-  wGH <- ghDat$w
-  
-  muVec <- cbind(1, xMat) %*% matrix(coef_yx_s, ncol = 1)
-  sofaMat <- matrix(muVec, nrow = nrow(xMat), ncol = length(xGH))
-  addedMat <-
-    matrix(
-      sqrt(2) * sigma_yx_s * xGH,
-      ncol = length(xGH),
-      nrow = nrow(xMat),
-      byrow = T
-    )
-  sofaMat <- sofaMat + addedMat
-  wMat <-
-    matrix(wGH,
-           nrow = nrow(xMat),
-           ncol = length(wGH),
-           byrow = T)
-  rowSums(sofaMat * exp(betaVal * sofaMat) * wMat) / sqrt(pi)
-}
+E_S_RHO_Y_Given_X_App <-
+  function(betaVal, pyxs, ghDat, xMat, pwr = 1)
+  {
+    coef_yx_s <- coef(pyxs)
+    sigma_yx_s <- sigma(pyxs)
+    
+    xGH <- ghDat$x
+    wGH <- ghDat$w
+    
+    muVec <- cbind(1, xMat) %*% matrix(coef_yx_s, ncol = 1)
+    sofaMat <- matrix(muVec, nrow = nrow(xMat), ncol = length(xGH))
+    addedMat <-
+      matrix(
+        sqrt(2) * sigma_yx_s * xGH,
+        ncol = length(xGH),
+        nrow = nrow(xMat),
+        byrow = T
+      )
+    sofaMat <- sofaMat + addedMat
+    wMat <-
+      matrix(wGH,
+             nrow = nrow(xMat),
+             ncol = length(wGH),
+             byrow = T)
+    rowSums(sofaMat * exp(pwr * betaVal * sofaMat) * wMat) / sqrt(pi)
+  }
 
 E_S_RHO_Y_App <- function(betaVal, sDat)
 {
@@ -339,4 +340,132 @@ Compute_Beta_Var_App <- function(betaVal,
                               sDat)
   }
   1 / mean(seff ^ 2) / length(seff)
+}
+
+Compute_BVec_App <-
+  function(betaVal,
+           pyxs,
+           ghDat,
+           xMat_t,
+           c_ps,
+           piVal,
+           xMat)
+  {
+    E_T_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal) -> e_t_tau
+    Compute_Tau_App(betaVal, pyxs, ghDat, xMat, c_ps, piVal) -> tau_x
+    (e_t_tau - tau_x) / (1 - e_t_tau)
+  }
+
+Compute_AVec_Phi_Y_App <-
+  function(betaVal,
+           pyxs,
+           ghDat,
+           xMat_t,
+           c_ps,
+           piVal,
+           xMat)
+  {
+    tau_x_t <-
+      Compute_Tau_App(betaVal, pyxs, ghDat, xMat_t, c_ps, piVal)
+    e_t_tau <- mean(tau_x_t)
+    tau_x <-
+      Compute_Tau_App(betaVal, pyxs, ghDat, xMat, c_ps, piVal)
+    e_s_rho_2_y_given_x_t <-
+      E_S_RHO_Y_Given_X_App(betaVal, pyxs, ghDat, xMat_t, pwr = 2)
+    e_s_rho_2_given_x_t <-
+      E_S_RHO_Given_X_App(betaVal, pyxs, 2, ghDat, xMat_t)
+    mean(e_s_rho_2_y_given_x_t / e_s_rho_2_given_x_t * tau_x_t) -> e_t_tau_xx
+    
+    e_s_rho_2_y_given_x <-
+      E_S_RHO_Y_Given_X_App(betaVal, pyxs, ghDat, xMat, pwr = 2)
+    e_s_rho_2_given_x <-
+      E_S_RHO_Given_X_App(betaVal, pyxs, 2, ghDat, xMat)
+    t_tau_xx <- tau_x * e_s_rho_2_y_given_x / e_s_rho_2_given_x
+    
+    A_x <-
+      (1 - tau_x) / (1 - e_t_tau) * e_t_tau_xx - tau_x * t_tau_xx
+    
+    return(A_x)
+  }
+
+Compute_Eff_Theta_App <- function(theta,
+                                  betaVal,
+                                  pyxs,
+                                  ghDat,
+                                  xMat_t,
+                                  c_ps,
+                                  piVal,
+                                  xMat_s,
+                                  sDat)
+{
+  xMat_s <- as.matrix(xMat_s)
+  xMat_t <- as.matrix(xMat_t)
+  
+  sofaScore <- sDat$sofa
+  AVec_s <- Compute_AVec_Phi_Y_App(betaVal,
+                                   pyxs,
+                                   ghDat,
+                                   xMat_t,
+                                   c_ps,
+                                   piVal,
+                                   xMat_s)
+  AVec_t <- Compute_AVec_Phi_Y_App(betaVal,
+                                   pyxs,
+                                   ghDat,
+                                   xMat_t,
+                                   c_ps,
+                                   piVal,
+                                   xMat_t)
+  BVec_s <- Compute_BVec_App(betaVal,
+                             pyxs,
+                             ghDat,
+                             xMat_t,
+                             c_ps,
+                             piVal,
+                             xMat_s)
+  BVec_t <- Compute_BVec_App(betaVal,
+                             pyxs,
+                             ghDat,
+                             xMat_t,
+                             c_ps,
+                             piVal,
+                             xMat_t)
+  part1 <-
+    1 / piVal * exp(betaVal * sofaScore) / c_ps * (sofaScore - theta + AVec_s -
+                                                     BVec_s * theta)
+  part2 <- -1 / (1 - piVal) * (AVec_t - BVec_t * theta)
+  c(part1, part2)
+}
+
+Compute_Eff_Theta_Sum_App <- function(theta,
+                                      betaVal,
+                                      pyxs,
+                                      ghDat,
+                                      xMat_t,
+                                      c_ps,
+                                      piVal,
+                                      xMat_s,
+                                      sDat)
+{
+  Compute_Eff_Theta_App(theta,
+                        betaVal,
+                        pyxs,
+                        ghDat,
+                        xMat_t,
+                        c_ps,
+                        piVal,
+                        xMat_s,
+                        sDat) -> theta_eff
+  mean(theta_eff) ^ 2
+}
+
+Compute_Eff_Theta_Naive_Sum_App <- function(theta,
+                                            betaVal,
+                                            c_ps,
+                                            piVal,
+                                            sDat)
+{
+  sofaScore <- sDat$sofa
+  1 / piVal * exp(betaVal * sofaScore) / c_ps * (sofaScore - theta) -> eff
+  mean(eff) ^ 2
 }
