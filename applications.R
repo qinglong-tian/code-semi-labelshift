@@ -182,6 +182,18 @@ optim(
   upper = 5
 ) -> fit2
 c_ps <- E_S_RHO_App(fit2$par, sDat)
+Compute_Beta_Var_App(
+  fit2$par,
+  pyxs,
+  ghDat,
+  as.matrix(sDat[,-ncol(sDat)]),
+  as.matrix(tDat[,-ncol(tDat)]),
+  c_ps,
+  piVal,
+  sDat,
+  proposed = F
+) -> var2
+
 optim(
   4,
   Compute_Eff_Theta_Naive_Sum_App,
@@ -237,17 +249,6 @@ mclapply(rexpVecList, function(rexpVec)
   return(naive_thetaa$par)
 },
 mc.cores = detectCores()) -> naive_theta_B
-
-Compute_Beta_Var_App(
-  fit2$par,
-  pyxs,
-  ghDat,
-  as.matrix(sDat[,-ncol(sDat)]),
-  as.matrix(tDat[,-ncol(tDat)]),
-  E_S_RHO_App(fit2$par, sDat),
-  piVal,
-  sDat
-) -> var2
 
 print_results(fit1, proposed_theta_est, var1, proposed_theta_B)
 
