@@ -282,6 +282,32 @@ Compute_S_Eff_Sum_App <-
     mean(S_Eff) ^ 2
   }
 
+Compute_S_Eff_Pert_Sum_App <- function(betaVal,
+                                       pyxs,
+                                       ghDat,
+                                       xMat_s,
+                                       xMat_t,
+                                       piVal,
+                                       sDat,
+                                       rexpVec)
+{
+  xMat_s <- as.matrix(xMat_s)
+  xMat_t <- as.matrix(xMat_t)
+  
+  c_ps <- E_S_RHO_App(betaVal, sDat)
+  
+  Compute_S_Eff_App(betaVal,
+                    pyxs,
+                    ghDat,
+                    xMat_s,
+                    xMat_t,
+                    c_ps,
+                    piVal,
+                    sDat) -> seff
+  mean(seff * rexpVec) ^ 2
+}
+
+
 Compute_S_Eff_Sum_Naive_App <-
   function(betaVal,
            pyxs,
@@ -304,6 +330,32 @@ Compute_S_Eff_Sum_Naive_App <-
                               piVal,
                               sDat)
     mean(S_Eff) ^ 2
+    
+  }
+
+Compute_S_Eff_Sum_Naive_Pert_App <-
+  function(betaVal,
+           pyxs,
+           ghDat,
+           xMat_s,
+           xMat_t,
+           piVal,
+           sDat,
+           rexpVec)
+  {
+    xMat_s <- as.matrix(xMat_s)
+    xMat_t <- as.matrix(xMat_t)
+    c_ps <- E_S_RHO_App(betaVal, sDat)
+    S_Eff <-
+      Compute_S_Eff_Naive_App(betaVal,
+                              pyxs,
+                              ghDat,
+                              xMat_s,
+                              xMat_t,
+                              c_ps,
+                              piVal,
+                              sDat)
+    mean(S_Eff * rexpVec) ^ 2
     
   }
 
@@ -459,6 +511,29 @@ Compute_Eff_Theta_Sum_App <- function(theta,
   mean(theta_eff) ^ 2
 }
 
+Compute_Eff_Theta_Sum_Pert_App <- function(theta,
+                                           betaVal,
+                                           pyxs,
+                                           ghDat,
+                                           xMat_t,
+                                           c_ps,
+                                           piVal,
+                                           xMat_s,
+                                           sDat,
+                                           rexpVec)
+{
+  Compute_Eff_Theta_App(theta,
+                        betaVal,
+                        pyxs,
+                        ghDat,
+                        xMat_t,
+                        c_ps,
+                        piVal,
+                        xMat_s,
+                        sDat) -> theta_eff
+  mean(theta_eff * rexpVec) ^ 2
+}
+
 Compute_Eff_Theta_Naive_Sum_App <- function(theta,
                                             betaVal,
                                             c_ps,
@@ -468,4 +543,38 @@ Compute_Eff_Theta_Naive_Sum_App <- function(theta,
   sofaScore <- sDat$sofa
   1 / piVal * exp(betaVal * sofaScore) / c_ps * (sofaScore - theta) -> eff
   mean(eff) ^ 2
+}
+
+Compute_Eff_Theta_Naive_Sum_Pert_App <- function(theta,
+                                                 betaVal,
+                                                 c_ps,
+                                                 piVal,
+                                                 sDat,
+                                                 rexpVec)
+{
+  sofaScore <- sDat$sofa
+  1 / piVal * exp(betaVal * sofaScore) / c_ps * (sofaScore - theta) -> eff
+  mean(eff * rexpVec[1:length(eff)]) ^ 2
+}
+
+print_results <- function(fit_beta, fit_theta, var_beta, theta_B)
+{
+  betaHat <- fit_beta$par
+  betaSE <- sqrt(var_beta)
+  betaLB <- betaHat - 1.96 * betaSE
+  betaUB <- betaHat + 1.96 * betaSE
+  
+  thetaHat <- fit_theta$par
+  theta_b_vec <- unlist(theta_B)
+  thetaSE <- sd(theta_b_vec)
+  thetaLB <- thetaHat - 1.96 * thetaSE
+  thetaUB <- thetaHat + 1.96 * thetaSE
+  
+  outMat <- matrix(nrow = 2, ncol = 4)
+  colnames(outMat) <- c("Estimate", "SE", "Lower", "Upper")
+  rownames(outMat) <- c("beta", "theta")
+  outMat[1,] <- c(betaHat, betaSE, betaLB, betaUB)
+  outMat[2,] <- c(thetaHat, thetaSE, thetaLB, thetaUB)
+  
+  return(outMat)
 }
