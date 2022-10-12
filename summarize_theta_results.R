@@ -14,11 +14,10 @@ read_in_data <- function(filename, dir)
 
 remove_outliers_2 <- function(vec)
 {
-  vec[!is.na(vec) & !is.finite(vec)] -> vec
+  # vec[!is.na(vec) & !is.infinite(vec)] -> vec
   one_iqr <- IQR(vec, na.rm = T)
   lwrq <- quantile(vec, 0.25, na.rm = T) - 2 * one_iqr
   uprq <- quantile(vec, 0.75, na.rm = T) + 2 * one_iqr
-  
   removed <- is.nan(vec) | is.na(vec) | (vec < lwrq) | (vec > uprq)
   out <- vec[!removed]
   
@@ -80,7 +79,6 @@ for (filename in filenames)
   
   # Use Perturbation: SE
   sdPertVec <- rtDat$Sd
-  sdPertVec <- sdPertVec[!removed_eff]
   remove_outliers_2(sdPertVec) -> pert_outliers
   removed_pert <- pert_outliers$removed
   sdPertVec <- pert_outliers$cleaned
@@ -103,6 +101,9 @@ for (filename in filenames)
   # Coverage using perturbation
   lwbPert <- thetaHatVec[!removed_pert] - 1.96 * sdPertVec
   upbPert <- thetaHatVec[!removed_pert] + 1.96 * sdPertVec
+  # lwbPert <- thetaHatVec - 1.96 * sdPertVec
+  # upbPert <- thetaHatVec + 1.96 * sdPertVec
+  
   cpPert <- mean(lwbPert < Mu_Y_T & upbPert > Mu_Y_T)
   # Mean Sd of perturbation
   sdMeanPert <- median(sdPertVec)

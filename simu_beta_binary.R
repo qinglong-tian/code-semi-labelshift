@@ -1,10 +1,10 @@
-library(parallel)
+library(doParallel)
 library(ranger)
 source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
 n <- 2000
-B1 <- 1000
+B1 <- 20
 
 Sys.time() -> t0
 
@@ -24,12 +24,16 @@ trueBeta <- -2
 gammaVec <- c(0, -trueBeta)
 
 dir.create(file.path("binary_dat/"))
+dir.create(file.path("binary_dat1/"))
 
 ###############
 # Preparation
 ###############
 
 # Data
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
 
 mclapply(1:B1, function(x)
 {
@@ -48,9 +52,6 @@ metric <- "Accuracy"
 
 # Estimating Probability
 
-cl <- makePSOCKcluster(detectCores())
-registerDoParallel(cl)
-
 lapply(data_list_mc, function(dat)
 {
   tData <- as.data.frame(dat$tData)
@@ -66,10 +67,12 @@ lapply(data_list_mc, function(dat)
   logitProbt <- fittedVal$prob_t
   
   # Random Forest
-  rfControl <- trainControl(method = "repeatedcv",
-                            number = 10,
-                            repeats = 3,
-                            search = "grid")
+  rfControl <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 3,
+    search = "grid"
+  )
   rftunegrid <-
     expand.grid(
       .mtry = c(1, 2),
@@ -164,7 +167,8 @@ lapply(data_list_mc, function(dat)
     method = "gbm",
     metric = "Accuracy",
     trControl = gbmControl,
-    tuneGrid = gbmGrid
+    tuneGrid = gbmGrid,
+    verbose = F
   ) -> gbmTrain
   
   gbmFit <- train(
@@ -172,7 +176,8 @@ lapply(data_list_mc, function(dat)
     data = sData,
     method = "gbm",
     tuneGrid = data.frame(gbmTrain$finalModel$tuneValue),
-    trControl = trainControl(method = "none")
+    trControl = trainControl(method = "none"),
+    verbose = F
   )
   
   gbmProbs <-
@@ -203,6 +208,65 @@ stopCluster(cl)
 ##########################
 # Estimation & Inference
 ##########################
+
+lipton_method_inference <- mclapply(1:B1, function(i) {
+  dat <- data_list_mc[[i]]
+  sData <- dat$sData
+  
+  probTemp <- probList[[i]]
+  # Logit
+  logit_s <- probTemp$logit_s
+  logit_t <- probTemp$logit_t
+  
+  logitBeta <-
+    Estimate_Beta_Lipton(logit_s, logit_t, sData, trueBeta)
+  
+  # Random Forest
+  rf_s <- probTemp$rf_s
+  rf_t <- probTemp$rf_t
+  
+  rfBeta <- Estimate_Beta_Lipton(rf_s, rf_t, sData, trueBeta)
+  
+  # MLP
+  mlp_s <- probTemp$mlp_s
+  mlp_t <- probTemp$mlp_t
+  
+  mlpBeta <- Estimate_Beta_Lipton(mlp_s, mlp_t, sData, trueBeta)
+  
+  # Naive Bayes
+  nb_s <- probTemp$nb_s
+  nb_t <- probTemp$nb_t
+  
+  nbBeta <- Estimate_Beta_Lipton(nb_s, nb_t, sData, trueBeta)
+  
+  # SVM
+  svm_s <- probTemp$svm_s
+  svm_t <- probTemp$svm_t
+  
+  svmBeta <- Estimate_Beta_Lipton(svm_s, svm_t, sData, trueBeta)
+  
+  # Gradient Boost
+  xgb_s <- probTemp$xgb_s
+  xgb_t <- probTemp$xgb_t
+  xgbBeta <- Estimate_Beta_Lipton(xgb_s, xgb_t, sData, trueBeta)
+  
+  return(
+    list(
+      beta_logit = logitBeta,
+      beta_rf = rfBeta,
+      beta_mlp = mlpBeta,
+      beta_nb = nbBeta,
+      beta_svm = svmBeta,
+      beta_xgb = xgbBeta
+    )
+  )
+},
+mc.cores = detectCores())
+
+saveRDS(
+  lipton_method_inference,
+  file = paste("binary_dat/Lipton_n_", n, ".RDS", sep = "")
+)
 
 estimation_inference <- mclapply(1:B1, function(i)
 {
@@ -419,7 +483,7 @@ estimation_inference <- mclapply(1:B1, function(i)
 },
 mc.cores = detectCores())
 
-Sys.time() -t0
+Sys.time() - t0
 
 saveRDS(
   estimation_inference,
