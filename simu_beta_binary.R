@@ -4,11 +4,11 @@ source("data_generating_functions_binary.R")
 source("estimation_functions_binary.R")
 
 n <- 2000
-B1 <- 100
+B1 <- 1000
 
 Sys.time() -> t0
 
-num_of_x <- 2
+num_of_x <- 3
 Mu_X <- rep(0, num_of_x)
 Sigma_X <- matrix(nrow = num_of_x, ncol = num_of_x)
 rho <- 0.8
