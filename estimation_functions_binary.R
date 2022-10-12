@@ -238,6 +238,34 @@ Compute_Lipton_Score <- function(betaVal, probVecS, probVecT, sData)
   return((score / (n + m)) ^ 2)
 }
 
+Compute_Lipton_Score_Pert <-
+  function(betaVal,
+           probVecS,
+           probVecT,
+           sData,
+           rexpVec)
+  {
+    yVec <- sData[, "Y"]
+    n <- length(probVecS)
+    m <- length(probVecT)
+    piVal <- n / (n + m)
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
+    
+    score <- 0
+    for (i in 1:n)
+    {
+      rhoVal <- exp(betaVal * yVec[i])
+      score <-
+        score + 1 / piVal * rhoVal / c_ps * probVecS[i] * rexpVec[i]
+    }
+    for (i in 1:m)
+    {
+      score <- score - 1 / (1 - piVal) * probVecT[i] * rexpVec[n + i]
+    }
+    return((score / (n + m)) ^ 2)
+  }
+
+
 Estimate_Beta_Lipton <-
   function(probVecS, probVecT, sData, initBeta)
   {
@@ -247,7 +275,32 @@ Estimate_Beta_Lipton <-
         Compute_Lipton_Score,
         probVecS = probVecS,
         probVecT = probVecT,
-        sData = sData
+        sData = sData,
+        method = "Brent",
+        lower = -3,
+        upper = 3
+      )
+    return(opt$par)
+  }
+
+Estimate_Beta_Lipton_Pert <-
+  function(probVecS,
+           probVecT,
+           sData,
+           initBeta,
+           rexpVec)
+  {
+    opt <-
+      optim(
+        initBeta,
+        Compute_Lipton_Score_Pert,
+        probVecS = probVecS,
+        probVecT = probVecT,
+        sData = sData,
+        rexpVec = rexpVec,
+        method = "Brent",
+        lower = -3,
+        upper = 3
       )
     return(opt$par)
   }
