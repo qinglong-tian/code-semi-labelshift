@@ -304,3 +304,169 @@ Estimate_Beta_Lipton_Pert <-
       )
     return(opt$par)
   }
+
+Compute_B_Matrix_Binary <-
+  function(betaVal,
+           yFittedGivenX,
+           yFittedGivenX_t,
+           piVal,
+           sData)
+  {
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
+    Tau_X <- Compute_Tau_Binary(betaVal, yFittedGivenX, c_ps, piVal)
+    Tau_X_t <-
+      Compute_Tau_Binary(betaVal, yFittedGivenX_t, c_ps, piVal)
+    E_t_Tau <- mean(Tau_X_t)
+    return((E_t_Tau - Tau_X) / (1 - E_t_Tau))
+  }
+
+E_S_Rho2_Phi_Given_X_Binary <- function(betaVal, yFittedGivenX)
+{
+  pr1 <- yFittedGivenX
+  out <- exp(2 * betaVal * 1) * 1 * pr1
+  return(out)
+}
+
+Compute_A_Mat_Binary <-
+  function(betaVal,
+           yFittedGivenX,
+           yFittedGivenX_t,
+           piVal,
+           sData)
+  {
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
+    Tau_x <- Compute_Tau_Binary(betaVal, yFittedGivenX, c_ps, piVal)
+    Tau_X_t <-
+      Compute_Tau_Binary(betaVal, yFittedGivenX_t, c_ps, piVal)
+    E_t_Tau <- mean(Tau_X_t)
+    firstTerm <- (1 - Tau_x) / (1 - E_t_Tau)
+    
+    E_t_Tau_Phi_X_t <-
+      E_S_Rho2_Phi_Given_X_Binary(betaVal, yFittedGivenX_t) / E_S_RHO_Given_X_Binary(betaVal, yFittedGivenX_t, 2)
+    secondTerm <- mean(Tau_X_t * E_t_Tau_Phi_X_t)
+    
+    E_t_Tau_Phi_X <-
+      E_S_Rho2_Phi_Given_X_Binary(betaVal, yFittedGivenX) / E_S_RHO_Given_X_Binary(betaVal, yFittedGivenX, 2)
+    thirdTerm <- -Tau_x * E_t_Tau_Phi_X
+    
+    A <- firstTerm * secondTerm + thirdTerm
+    
+    return(A)
+  }
+
+Compute_Phi_Eff_Theta <-
+  function(thetaVal,
+           betaVal,
+           yFittedGivenX,
+           yFittedGivenX_t,
+           piVal,
+           sData)
+  {
+    c_ps <- E_S_RHO_Binary(betaVal, sData)
+    yVec <- sData[, "Y"]
+    rhoVec <- exp(betaVal * yVec)
+    Compute_A_Mat_Binary(betaVal, yFittedGivenX, yFittedGivenX_t, piVal, sData) -> A_x
+    Compute_A_Mat_Binary(betaVal, yFittedGivenX_t, yFittedGivenX_t, piVal, sData) -> A_x_t
+    
+    Compute_B_Matrix_Binary(betaVal, yFittedGivenX, yFittedGivenX_t, piVal, sData) -> B_x
+    Compute_B_Matrix_Binary(betaVal, yFittedGivenX_t, yFittedGivenX_t, piVal, sData) -> B_x_t
+    
+    1 / piVal * rhoVec / c_ps * (yVec - thetaVal + A_x - B_x * thetaVal) -> part1
+    - 1 / (1 - piVal) * (A_x_t - B_x_t * thetaVal) -> part2
+    
+    return(c(part1, part2))
+  }
+
+Compute_Phi_Theta <- function(thetaVal, betaVal, sData, piVal)
+{
+  yVec <- sData[, "Y"]
+  c_ps <- E_S_RHO_Binary(betaVal, sData)
+  rhoVec <- exp(betaVal * yVec)
+  rhoVec / c_ps * (yVec - thetaVal) / piVal
+}
+
+Estimate_Theta_Sum_Eff <- function(thetaVal,
+                                   betaVal,
+                                   yFittedGivenX,
+                                   yFittedGivenX_t,
+                                   piVal,
+                                   sData)
+{
+  Compute_Phi_Eff_Theta(thetaVal,
+                        betaVal,
+                        yFittedGivenX,
+                        yFittedGivenX_t,
+                        piVal,
+                        sData) -> seff
+  return(mean(seff) ^ 2)
+}
+
+Estiamte_Theta_Sum_Eff_Pert <- function(thetaVal,
+                                        betaVal,
+                                        yFittedGivenX,
+                                        yFittedGivenX_t,
+                                        piVal,
+                                        sData,
+                                        rexpVec)
+{
+  Compute_Phi_Eff_Theta(thetaVal,
+                        betaVal,
+                        yFittedGivenX,
+                        yFittedGivenX_t,
+                        piVal,
+                        sData) -> seff
+  mean(seff * rexpVec) ^ 2
+}
+
+Estimate_Theta_Pert_Optim <- function(betaVal,
+                                      yFittedGivenX,
+                                      yFittedGivenX_t,
+                                      piVal,
+                                      sData,
+                                      rexpVec)
+{
+  optim(
+    initTheta,
+    Estiamte_Theta_Sum_Eff_Pert,
+    betaVal = betaVal,
+    yFittedGivenX = yFittedGivenX,
+    yFittedGivenX_t = yFittedGivenX_t,
+    piVal = piVal,
+    sData = sData,
+    rexpVec = rexpVec,
+    method = "Brent",
+    lower = 0,
+    upper = 1
+  ) -> optimOut
+  return(optimOut$par)
+}
+
+Estimate_Theta_Sum_Naive <- function(thetaVal, betaVal, sData, piVal)
+{
+  seff <- Compute_Phi_Theta(thetaVal, betaVal, sData, piVal)
+  return(mean(seff) ^ 2)
+}
+
+Estimate_Theta_Sum_Naive_Pert <-
+  function(thetaVal, betaVal, sData, piVal, rexpVec)
+  {
+    seff <- Compute_Phi_Theta(thetaVal, betaVal, sData, piVal)
+    return(mean(seff * rexpVec[1:length(seff)]) ^ 2)
+  }
+
+Estimate_optim_Theta_Naive_Pert <-
+  function(betaVal, sData, piVal, rexpVec)
+  {
+    optim(
+      initTheta,
+      Estimate_Theta_Sum_Naive_Pert,
+      betaVal = betaVal,
+      sData = sData,
+      piVal = piVal,
+      rexpVec = rexpVec,
+      method = "Brent",
+      lower = 0,
+      upper = 1
+    ) -> opt
+    opt$par
+  }
