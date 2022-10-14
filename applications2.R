@@ -117,7 +117,7 @@ mclapply(rexpVec_List, function(rexpVec)
   Estimate_Beta_Lipton_Pert(rfProbs, rfProbt, sDat, initBeta, rexpVec) -> o1
   Estimate_optim_Theta_Naive_Pert(o1, sDat, piVal, rexpVec) -> o2
   
-  Estimate_Beta_Prop_Pert(sDat, piVal, rfProbs, rfProbs, rexpVec) -> oo
+  Estimate_Beta_Prop_Pert(sDat, piVal, rfProbs, rfProbt, rexpVec) -> oo
   Estimate_Theta_Pert_Optim(oo, rfProbs, rfProbt, piVal, sDat, rexpVec) -> o3
   return(list(
     beta = o1,
