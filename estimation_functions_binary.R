@@ -197,6 +197,31 @@ Compute_S_Eff_Sum <-
     return(mean(S_Eff) ^ 2)
   }
 
+Compute_S_Eff_Sum_Pert <- function(betaVal, sData, piVal, yFittedGivenX, yFittedGivenX_tDat, rexpVec)
+{
+  c_ps <- E_S_RHO_Binary(betaVal, sData)
+  S_Eff <-
+    Compute_S_Eff_Binary(betaVal,
+                         sData,
+                         c_ps,
+                         piVal,
+                         yFittedGivenX,
+                         yFittedGivenX_tDat)
+  return(mean(S_Eff*rexpVec)^2)
+}
+
+Estimate_Beta_Prop_Pert <- function(sData, piVal, yFittedGivenX, yFittedGivenX_tDat, rexpVec)
+{
+  optim(initBeta,
+        Compute_S_Eff_Sum_Pert,
+        sData = sData,
+        piVal = piVal,
+        yFittedGivenX = yFittedGivenX,
+        yFittedGivenX_tDat = yFittedGivenX_tDat,
+        rexpVec = rexpVec) -> tmpOut
+  return(tmpOut$par)
+}
+
 Compute_SE_Binary <-
   function(betaVal,
            sData,
