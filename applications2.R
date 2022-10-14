@@ -1,5 +1,6 @@
 library(tidyverse)
 library(parallel)
+library(cramer)
 source("estimation_functions_binary.R")
 
 dat_dir <- "real_dat"
@@ -34,18 +35,32 @@ data <-
   mutate(Y = ifelse(sofa >= 3, 1, 0), .before = diasbp_min) %>%
   filter(age < 65) %>% group_by(subject_id) %>% slice(which.min(admittime)) %>%
   na.omit() %>% mutate(R = if_else(insurance %in% c("Medicare", "Medicaid"), 0, 1))
-data %>% ungroup(subject_id) %>% select(-age,-subject_id,-admittime,-insurance,-sofa) -> data
+data %>% ungroup(subject_id) %>% select(-age, -subject_id, -admittime, -insurance, -sofa) -> data
 
 # winequality <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", sep = ";")
 # data <- winequality %>%
 #   mutate(Y = ifelse(quality <= 4, 1, 0),
-#          .before = fixed.acidity) %>% 
-#   mutate(R = ifelse(alcohol < 10.5, 1, 0)) %>% 
+#          .before = fixed.acidity) %>%
+#   mutate(R = ifelse(alcohol < 10.5, 1, 0)) %>%
 #   select(-quality)
 
 sDat <- data %>% filter(R == 1) %>% select(-R) %>% as.data.frame()
 tDat <-
-  data %>% filter(R == 0) %>% select(-R,-Y) %>% as.data.frame()
+  data %>% filter(R == 0) %>% select(-R, -Y) %>% as.data.frame()
+tDat_full <- data %>% filter(R == 0) %>% select(-R)
+
+tDat_full_Y0 <- tDat_full %>% filter(Y == 0) %>% select(-Y)
+tDat_full_Y1 <- tDat_full %>% filter(Y == 1) %>% select(-Y)
+
+sDat_Y0 <- sDat %>% filter(Y == 0) %>% select(-Y)
+sDat_Y1 <- sDat %>% filter(Y == 1) %>% select(-Y)
+
+cramer.test(as.matrix(tDat_full_Y0)[sample(nrow(tDat_full_Y0), 1000, replace = F),],
+            as.matrix(sDat_Y0)[sample(nrow(sDat_Y0), 1000, replace = F),],
+            kernel = "phiBahr") -> sameDist0
+cramer.test(as.matrix(tDat_full_Y1)[sample(nrow(tDat_full_Y1), 1000, replace = F),],
+            as.matrix(sDat_Y1)[sample(nrow(sDat_Y1), 1000, replace = F),],
+            kernel = "phiBahr") -> sameDist1
 
 logitReg <- glm(Y ~ ., data = sDat, family = binomial)
 rfProbs <- predict(logitReg, newdata = sDat, type = "response")
@@ -93,7 +108,6 @@ optim(
 ) -> thetaOut
 thetaOut$par # Theta proposed
 
-tDat_full <- data %>% filter(R == 0)
 mean(tDat_full$Y) # Theta oracle
 
 optim(
@@ -122,11 +136,41 @@ mclapply(rexpVec_List, function(rexpVec)
   return(list(
     beta = o1,
     theta = o2,
-    theta_p = o3
+    theta_p = o3,
+    beta_p = oo
   ))
 },
 mc.cores = detectCores()) -> beta_vector
 
-unlist(beta_vector) %>% matrix(ncol = 3, byrow = T) -> pert_SE
+unlist(beta_vector) %>% matrix(ncol = 4, byrow = T) -> pert_SE
 apply(pert_SE, 2, sd)
 
+#
+data <-
+  dat3 %>% select(
+    diasbp_min,
+    glucose_min,
+    resprate_max,
+    sysbp_min,
+    temp_min,
+    temp_max,
+    hematocrit_mean,
+    hematocrit_min,
+    platelets_mean,
+    platelets_min,
+    redbloodcell_mean,
+    redbloodcell_min,
+    spo2_min,
+    urea_n_min,
+    urea_n_max,
+    urea_n_mean,
+    insurance,
+    age,
+    subject_id,
+    admittime,
+    sofa
+  ) %>% mutate(admittime = as.Date(admittime, "%m/%d/%Y")) %>%
+  mutate(Y = ifelse(sofa >= 3, 1, 0), .before = diasbp_min) %>%
+  filter(age < 65) %>% group_by(subject_id) %>% slice(which.min(admittime)) %>%
+  na.omit() %>% mutate(R = if_else(insurance %in% c("Medicare", "Medicaid"), 0, 1))
+data %>% ungroup(subject_id) %>% select(-age, -subject_id, -admittime, -insurance, -sofa) -> data
