@@ -1,2 +1,15 @@
-# code-semi-labelshift
-For the semi-parametric approach to the label shift problem
+## Optimal Target Shift
+
+### Simulation A
+- "simu_beta.R"
+- "simu_theta.R"
+
+### Simulation B
+- "simu_test.R"
+
+### Simulation C
+- "simu_beta_binary.R"
+
+### Application
+- "applications.R"
+- "applications2.R"
